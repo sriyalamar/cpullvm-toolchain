@@ -20,7 +20,7 @@ jobs:
       matrix:
         branches:
           - from_branch: main
-            to_branch: qualcomm-software
+            to_branch: qualcomm-software-latest
     steps:
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
