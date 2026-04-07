@@ -188,8 +188,9 @@ static bool applySubstringHeuristic(StringRef Arg, StringRef Param,
           Current[J] = 1 + Previous[J - 1];
 
         MaxLength = std::max(MaxLength, Current[J]);
-      } else
+      } else {
         Current[J] = 0;
+      }
     }
 
     Current.swap(Previous);
@@ -203,7 +204,7 @@ static bool applyLevenshteinHeuristic(StringRef Arg, StringRef Param,
                                       int8_t Threshold) {
   const std::size_t LongerLength = std::max(Arg.size(), Param.size());
   double Dist = Arg.edit_distance(Param);
-  Dist = (1.0 - Dist / LongerLength) * 100.0;
+  Dist = (1.0 - (Dist / LongerLength)) * 100.0;
   return Dist > Threshold;
 }
 
@@ -521,17 +522,19 @@ SuspiciousCallArgumentCheck::SuspiciousCallArgumentCheck(
     auto H = static_cast<Heuristic>(Idx);
     if (GetToggleOpt(H))
       AppliedHeuristics.emplace_back(H);
-    ConfiguredBounds.emplace_back(
-        std::make_pair(GetBoundOpt(H, BoundKind::DissimilarBelow),
-                       GetBoundOpt(H, BoundKind::SimilarAbove)));
+    ConfiguredBounds.emplace_back(GetBoundOpt(H, BoundKind::DissimilarBelow),
+                                  GetBoundOpt(H, BoundKind::SimilarAbove));
   }
 
   for (const StringRef Abbreviation : optutils::parseStringList(
            Options.get("Abbreviations", DefaultAbbreviations))) {
-    auto KeyAndValue = Abbreviation.split("=");
-    assert(!KeyAndValue.first.empty() && !KeyAndValue.second.empty());
-    AbbreviationDictionary.insert(
-        std::make_pair(KeyAndValue.first, KeyAndValue.second.str()));
+    const auto [Key, Value] = Abbreviation.split("=");
+    if (Key.empty() || Value.empty()) {
+      configurationDiag("Invalid abbreviation configuration '%0', ignoring.")
+          << Abbreviation;
+      continue;
+    }
+    AbbreviationDictionary.try_emplace(Key, Value.str());
   }
 }
 

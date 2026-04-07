@@ -7,8 +7,7 @@
 
 %struct.barney = type { i8, double }
 
-; Function Attrs: nofree norecurse noreturn nounwind memory(readwrite, target_mem0: none, target_mem1: none)
-define amdgpu_kernel void @zot() local_unnamed_addr #0 {
+define amdgpu_kernel void @zot() {
 ; CHECK-LABEL: @zot(
 ; CHECK-NEXT:  bb:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call noalias nonnull dereferenceable(64) ptr addrspace(4) @llvm.amdgcn.dispatch.ptr()
@@ -53,10 +52,10 @@ define amdgpu_kernel void @zot() local_unnamed_addr #0 {
 bb:
   %alloca = alloca %struct.barney, align 16, addrspace(5)
   %alloca1 = alloca %struct.barney, align 16, addrspace(5)
-  store i32 0, ptr addrspace(5) null, align 2147483648
+  store i32 0, ptr addrspace(5) zeroinitializer, align 2147483648
   call void @llvm.memcpy.p5.p5.i64(ptr addrspace(5) noundef align 16 dereferenceable(16) %alloca1, ptr addrspace(5) noundef align 16 dereferenceable(16) %alloca, i64 16, i1 false)
   call void @llvm.memcpy.p5.p0.i64(ptr addrspace(5) noundef align 16 dereferenceable(16) %alloca, ptr noundef nonnull align 1 dereferenceable(16) poison, i64 16, i1 false)
-  %load = load volatile ptr, ptr addrspace(5) null, align 2147483648
+  %load = load volatile ptr, ptr addrspace(5) zeroinitializer, align 2147483648
   br label %bb2
 
 bb2:                                              ; preds = %bb2, %bb
@@ -64,7 +63,4 @@ bb2:                                              ; preds = %bb2, %bb
   br label %bb2
 }
 
-declare ptr @hoge() local_unnamed_addr #1
-
-attributes #0 = { nofree norecurse noreturn nounwind memory(readwrite, target_mem0: none, target_mem1: none) "amdgpu-agpr-alloc"="0" "amdgpu-no-cluster-id-x" "amdgpu-no-cluster-id-y" "amdgpu-no-cluster-id-z" "amdgpu-no-completion-action" "amdgpu-no-default-queue" "amdgpu-no-dispatch-id" "amdgpu-no-dispatch-ptr" "amdgpu-no-flat-scratch-init" "amdgpu-no-heap-ptr" "amdgpu-no-hostcall-ptr" "amdgpu-no-implicitarg-ptr" "amdgpu-no-lds-kernel-id" "amdgpu-no-multigrid-sync-arg" "amdgpu-no-queue-ptr" "amdgpu-no-workgroup-id-x" "amdgpu-no-workgroup-id-y" "amdgpu-no-workgroup-id-z" "amdgpu-no-workitem-id-x" "amdgpu-no-workitem-id-y" "amdgpu-no-workitem-id-z" "uniform-work-group-size"="false" }
-attributes #1 = { "uniform-work-group-size"="false" }
+declare ptr @hoge()

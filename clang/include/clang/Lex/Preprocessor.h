@@ -137,30 +137,6 @@ struct CXXStandardLibraryVersionInfo {
   std::uint64_t Version;
 };
 
-/// Record the previous 'export' keyword info.
-///
-/// Since P1857R3, the standard introduced several rules to determine whether
-/// the 'module', 'export module', 'import', 'export import' is a valid
-/// directive introducer. This class is used to record the previous 'export'
-/// keyword token, and then handle 'export module' and 'export import'.
-class ExportContextualKeywordInfo {
-  Token ExportTok;
-  bool AtPhysicalStartOfLine = false;
-
-public:
-  ExportContextualKeywordInfo() = default;
-  ExportContextualKeywordInfo(const Token &Tok, bool AtPhysicalStartOfLine)
-      : ExportTok(Tok), AtPhysicalStartOfLine(AtPhysicalStartOfLine) {}
-
-  bool isValid() const { return ExportTok.is(tok::kw_export); }
-  bool isAtPhysicalStartOfLine() const { return AtPhysicalStartOfLine; }
-  Token getExportTok() const { return ExportTok; }
-  void reset() {
-    ExportTok.startToken();
-    AtPhysicalStartOfLine = false;
-  }
-};
-
 class ModuleNameLoc final
     : llvm::TrailingObjects<ModuleNameLoc, IdentifierLoc> {
   friend TrailingObjects;
@@ -415,7 +391,7 @@ private:
   bool ImportingCXXNamedModules = false;
 
   /// Whether the last token we lexed was an 'export' keyword.
-  ExportContextualKeywordInfo LastTokenWasExportKeyword;
+  Token LastExportKeyword;
 
   /// First pp-token source location in current translation unit.
   SourceLocation FirstPPTokenLoc;
@@ -830,6 +806,12 @@ private:
   ///
   /// Only one of CurLexer, or CurTokenLexer will be non-null.
   std::unique_ptr<Lexer> CurLexer;
+
+  /// Lexers that are pending destruction, deferred until the current
+  /// Stack of Lexer unwinds completely (LexLevel returns to 0).
+  /// This avoids use-after-free when HandleEndOfFile is called from
+  /// within a Lexer method that still needs to access its members.
+  SmallVector<std::unique_ptr<Lexer>, 2> PendingDestroyLexers;
 
   /// The current top of the stack that we're lexing from
   /// if not expanding a macro.
@@ -1851,8 +1833,11 @@ public:
   bool LexModuleNameContinue(Token &Tok, SourceLocation UseLoc,
                              SmallVectorImpl<Token> &Suffix,
                              SmallVectorImpl<IdentifierLoc> &Path,
-                             bool AllowMacroExpansion = true,
-                             bool IsPartition = false);
+                             bool AllowMacroExpansion, bool IsPartition);
+  bool HandleModuleName(StringRef DirType, SourceLocation UseLoc, Token &Tok,
+                        SmallVectorImpl<IdentifierLoc> &Path,
+                        SmallVectorImpl<Token> &DirToks,
+                        bool AllowMacroExpansion, bool IsPartition);
   void EnterModuleSuffixTokenStream(ArrayRef<Token> Toks);
   void HandleCXXImportDirective(Token Import);
   void HandleCXXModuleDirective(Token Module);
@@ -1863,8 +1848,7 @@ public:
   /// This consumes the import/module directive, modifies the
   /// lexer/preprocessor state, and advances the lexer(s) so that the next token
   /// read is the correct one.
-  bool HandleModuleContextualKeyword(Token &Result,
-                                     bool TokAtPhysicalStartOfLine);
+  bool HandleModuleContextualKeyword(Token &Result);
 
   /// Get the start location of the first pp-token in main file.
   SourceLocation getMainFileFirstPPTokenLoc() const {
@@ -2598,13 +2582,11 @@ public:
   /// resource. \p isAngled indicates whether the file reference is for
   /// system \#include's or not (i.e. using <> instead of ""). If \p OpenFile
   /// is true, the file looked up is opened for reading, otherwise it only
-  /// validates that the file exists. Quoted filenames are looked up relative
-  /// to \p LookupFromFile if it is nonnull.
+  /// validates that the file exists.
   ///
   /// Returns std::nullopt on failure.
-  OptionalFileEntryRef
-  LookupEmbedFile(StringRef Filename, bool isAngled, bool OpenFile,
-                  const FileEntry *LookupFromFile = nullptr);
+  OptionalFileEntryRef LookupEmbedFile(StringRef Filename, bool isAngled,
+                                       bool OpenFile);
 
   /// Return true if we're in the top-level file, not in a \#include.
   bool isInPrimaryFile() const;
@@ -2632,6 +2614,8 @@ private:
   }
 
   void PopIncludeMacroStack() {
+    if (CurLexer)
+      PendingDestroyLexers.push_back(std::move(CurLexer));
     CurLexer = std::move(IncludeMacroStack.back().TheLexer);
     CurPPLexer = IncludeMacroStack.back().ThePPLexer;
     CurTokenLexer = std::move(IncludeMacroStack.back().TheTokenLexer);
@@ -2912,8 +2896,7 @@ private:
       SmallVectorImpl<char> &RelativePath, SmallVectorImpl<char> &SearchPath,
       ModuleMap::KnownHeader &SuggestedModule, bool isAngled);
   // Binary data inclusion
-  void HandleEmbedDirective(SourceLocation HashLoc, Token &Tok,
-                            const FileEntry *LookupFromFile = nullptr);
+  void HandleEmbedDirective(SourceLocation HashLoc, Token &Tok);
   void HandleEmbedDirectiveImpl(SourceLocation HashLoc,
                                 const LexEmbedParametersResult &Params,
                                 StringRef BinaryContents, StringRef FileName);
