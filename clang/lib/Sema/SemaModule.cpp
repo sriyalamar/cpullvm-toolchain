@@ -18,6 +18,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/ParsedAttr.h"
 #include "clang/Sema/SemaInternal.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
 
 using namespace clang;
@@ -385,9 +386,9 @@ Sema::ActOnModuleDecl(SourceLocation StartLoc, SourceLocation ModuleLoc,
       Diag(Path[0].getLoc(), diag::err_module_redefinition) << ModuleName;
       if (M->DefinitionLoc.isValid())
         Diag(M->DefinitionLoc, diag::note_prev_module_definition);
-      else if (OptionalFileEntryRef FE = M->getASTFile())
+      else if (const ModuleFileName *FileName = M->getASTFileName())
         Diag(M->DefinitionLoc, diag::note_prev_module_definition_from_ast_file)
-            << FE->getName();
+            << *FileName;
       Mod = M;
       break;
     }
@@ -463,9 +464,6 @@ Sema::ActOnModuleDecl(SourceLocation StartLoc, SourceLocation ModuleLoc,
   ImportState = ModuleImportState::ImportAllowed;
 
   getASTContext().setCurrentNamedModule(Mod);
-
-  if (auto *Listener = getASTMutationListener())
-    Listener->EnteringModulePurview();
 
   // We already potentially made an implicit import (in the case of a module
   // implementation unit importing its interface).  Make this module visible
@@ -942,6 +940,18 @@ static bool checkExportedDecl(Sema &S, Decl *D, SourceLocation BlockStart) {
       D->setInvalidDecl();
       return false;
     }
+
+    if (isa<FunctionDecl>(D)) {
+      FunctionDecl *FD = cast<FunctionDecl>(D);
+      for (const ParmVarDecl *PVD : FD->parameters()) {
+        if (PVD->hasAttr<HLSLGroupSharedAddressSpaceAttr>()) {
+          S.Diag(D->getBeginLoc(), diag::err_hlsl_attr_incompatible)
+              << "'export'" << "'groupshared' parameter";
+          D->setInvalidDecl();
+          return false;
+        }
+      }
+    }
   }
 
   //  C++20 [module.interface]p3:
@@ -1123,6 +1133,7 @@ public:
 private:
   llvm::DenseSet<const NamedDecl *> ExposureSet;
   llvm::DenseSet<const NamedDecl *> KnownNonExposureSet;
+  llvm::DenseSet<const NamedDecl *> CheckingDecls;
 };
 
 bool ExposureChecker::isTULocal(QualType Ty) {
@@ -1208,6 +1219,12 @@ bool ExposureChecker::isTULocal(const NamedDecl *D) {
       break;
     }
   }
+
+  // Avoid recursions.
+  if (CheckingDecls.count(D))
+    return false;
+  CheckingDecls.insert(D);
+  llvm::scope_exit RemoveCheckingDecls([&] { CheckingDecls.erase(D); });
 
   // [basic.link]p15.5
   // - a specialization of a template whose (possibly instantiated) declaration
