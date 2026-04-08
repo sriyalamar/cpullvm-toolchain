@@ -280,8 +280,8 @@ def main():
             git_repo, args.from_branch, args.to_branch
         )
         for commit_hash in merge_commits:
-            if is_patch_already_applied(git_repo, commit, args.to_branch):
-                logger.info("Skipping already-applied commit %s", commit)
+            if is_patch_already_applied(git_repo, commit_hash, args.to_branch):
+                logger.info("Skipping already-applied commit %s", commit_hash)
                 continue
             merge_commit(
                 git_repo,
