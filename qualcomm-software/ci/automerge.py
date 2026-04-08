@@ -92,6 +92,13 @@ def prefix_current_commit_message(git_repo: Git) -> None:
     commit_msg = f"Automerge: {log_output}"
     git_repo.run_cmd(["commit", "--amend", "--message=" + commit_msg])
 
+def is_patch_already_applied(git_repo: Git, commit_hash: str, to_branch: str) -> bool:
+    """
+    Returns True if the patch equivalent of commit_hash
+    already exists in to_branch.
+    """
+    output = git_repo.run_cmd(["cherry", to_branch, commit_hash])
+    return output.startswith("-")
 
 def merge_commit(
     git_repo: Git,
@@ -273,6 +280,9 @@ def main():
             git_repo, args.from_branch, args.to_branch
         )
         for commit_hash in merge_commits:
+            if is_patch_already_applied(git_repo, commit, args.to_branch):
+                logger.info("Skipping already-applied commit %s", commit)
+                continue
             merge_commit(
                 git_repo,
                 args.to_branch,
