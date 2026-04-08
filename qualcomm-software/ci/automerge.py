@@ -21,6 +21,7 @@ MERGE_CONFLICT_LABEL = "automerge_conflict"
 AUTOMERGE_BRANCH = "automerge"
 REMOTE_NAME = "origin"
 MERGE_IGNORE_PATHSPEC_FILE = Path(__file__).parent / ".automerge_ignore"
+AUTOMERGE_BASE_TAG = "automerge-base"
 
 class MergeConflictError(Exception):
     """
