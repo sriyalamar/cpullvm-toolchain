@@ -22,7 +22,6 @@ AUTOMERGE_BRANCH = "automerge"
 REMOTE_NAME = "origin"
 MERGE_IGNORE_PATHSPEC_FILE = Path(__file__).parent / ".automerge_ignore"
 
-
 class MergeConflictError(Exception):
     """
     An exception representing a failed merge from upstream due to a conflict.
@@ -91,14 +90,6 @@ def prefix_current_commit_message(git_repo: Git) -> None:
     )
     commit_msg = f"Automerge: {log_output}"
     git_repo.run_cmd(["commit", "--amend", "--message=" + commit_msg])
-
-def is_patch_already_applied(git_repo: Git, commit_hash: str, to_branch: str) -> bool:
-    """
-    Returns True if the patch equivalent of commit_hash
-    already exists in to_branch.
-    """
-    output = git_repo.run_cmd(["cherry", to_branch, commit_hash])
-    return output.startswith("-")
 
 def merge_commit(
     git_repo: Git,
@@ -184,8 +175,13 @@ def get_merge_commit_list(git_repo: Git, from_branch: str, to_branch: str) -> li
     logger.info(
         "Calculating list of commits to be merged from %s to %s", from_branch, to_branch
     )
-    merge_base_output = git_repo.run_cmd(["merge-base", from_branch, to_branch])
-    merge_base_commit = merge_base_output.strip()
+
+    try:
+       merge_base_commit = git_repo.run_cmd(["rev-parse", "--verify", AUTOMERGE_BASE_TAG]).strip()
+       logger.info("Using base tag %s (%s)", AUTOMERGE_BASE_TAG, merge_base_commit)
+    except subprocess.CalledProcessError:
+        merge_base_commit = git_repo.run_cmd(["merge-base", from_branch, to_branch]).strip()
+        logger.info("Using merge-base %s", merge_base_commit)
     log_output = git_repo.run_cmd(
         ["log", f"{merge_base_commit}..{from_branch}", "--pretty=format:%H"]
     )
@@ -196,6 +192,8 @@ def get_merge_commit_list(git_repo: Git, from_branch: str, to_branch: str) -> li
     commit_list = commit_list.split("\n")
     commit_list.reverse()
     logger.info("Found %d commits to be merged", len(commit_list))
+    logger.info("First commit getting synced : %s", commit_list[0])
+    logger.info("Last  commit getting synced : %s", commit_list[-1])
     return commit_list
 
 
@@ -280,9 +278,6 @@ def main():
             git_repo, args.from_branch, args.to_branch
         )
         for commit_hash in merge_commits:
-            if is_patch_already_applied(git_repo, commit_hash, args.to_branch):
-                logger.info("Skipping already-applied commit %s", commit_hash)
-                continue
             merge_commit(
                 git_repo,
                 args.to_branch,
