@@ -49,6 +49,11 @@ protected:
   LLVM_ABI ~GlobalObject();
 
   Comdat *ObjComdat = nullptr;
+
+  friend class Value;
+  /// Index of first metadata attachment in context, or zero.
+  unsigned MetadataIndex = 0;
+
   enum {
     LastAlignmentBit = 5,
     LastCodeModelBit = 8,
@@ -142,6 +147,8 @@ public:
   using Value::getMetadata;
   using Value::hasMetadata;
   using Value::setMetadata;
+
+  LLVM_ABI bool hasMetadataOtherThanDebugLoc() const;
 
   /// Copy metadata from Src, adjusting offsets by Offset.
   LLVM_ABI void copyMetadata(const GlobalObject *Src, unsigned Offset);

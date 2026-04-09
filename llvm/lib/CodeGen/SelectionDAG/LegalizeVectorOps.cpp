@@ -191,6 +191,8 @@ class VectorLegalizer {
   void PromoteFloatVECREDUCE(SDNode *Node, SmallVectorImpl<SDValue> &Results,
                              bool NonArithmetic);
 
+  void PromoteVECTOR_COMPRESS(SDNode *Node, SmallVectorImpl<SDValue> &Results);
+
 public:
   VectorLegalizer(SelectionDAG& dag) :
       DAG(dag), TLI(dag.getTargetLoweringInfo()) {}
@@ -296,7 +298,8 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
     ISD::LoadExtType ExtType = LD->getExtensionType();
     EVT LoadedVT = LD->getMemoryVT();
     if (LoadedVT.isVector() && ExtType != ISD::NON_EXTLOAD)
-      Action = TLI.getLoadExtAction(ExtType, LD->getValueType(0), LoadedVT);
+      Action = TLI.getLoadAction(LD->getValueType(0), LoadedVT, LD->getAlign(),
+                                 LD->getAddressSpace(), ExtType, false);
     break;
   }
   case ISD::STORE: {
@@ -304,7 +307,8 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
     EVT StVT = ST->getMemoryVT();
     MVT ValVT = ST->getValue().getSimpleValueType();
     if (StVT.isVector() && ST->isTruncatingStore())
-      Action = TLI.getTruncStoreAction(ValVT, StVT);
+      Action = TLI.getTruncStoreAction(ValVT, StVT, ST->getAlign(),
+                                       ST->getAddressSpace());
     break;
   }
   case ISD::MERGE_VALUES:
@@ -387,6 +391,9 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
   case ISD::CTLZ_ZERO_UNDEF:
   case ISD::CTTZ_ZERO_UNDEF:
   case ISD::CTPOP:
+  case ISD::CLMUL:
+  case ISD::CLMULH:
+  case ISD::CLMULR:
   case ISD::SELECT:
   case ISD::VSELECT:
   case ISD::SELECT_CC:
@@ -421,6 +428,7 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
   case ISD::FLDEXP:
   case ISD::FPOWI:
   case ISD::FPOW:
+  case ISD::FCBRT:
   case ISD::FLOG:
   case ISD::FLOG2:
   case ISD::FLOG10:
@@ -454,6 +462,7 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
   case ISD::USUBO:
   case ISD::SMULO:
   case ISD::UMULO:
+  case ISD::CONVERT_FROM_ARBITRARY_FP:
   case ISD::FCANONICALIZE:
   case ISD::FFREXP:
   case ISD::FMODF:
@@ -509,6 +518,8 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
   case ISD::VECREDUCE_FMIN:
   case ISD::VECREDUCE_FMINIMUM:
   case ISD::VECREDUCE_FMUL:
+  case ISD::CTTZ_ELTS:
+  case ISD::CTTZ_ELTS_ZERO_POISON:
   case ISD::VECTOR_FIND_LAST_ACTIVE:
     Action = TLI.getOperationAction(Node->getOpcode(),
                                     Node->getOperand(0).getValueType());
@@ -705,6 +716,33 @@ void VectorLegalizer::PromoteFloatVECREDUCE(SDNode *Node,
   Results.push_back(Res);
 }
 
+void VectorLegalizer::PromoteVECTOR_COMPRESS(
+    SDNode *Node, SmallVectorImpl<SDValue> &Results) {
+  SDLoc DL(Node);
+  EVT VT = Node->getValueType(0);
+  MVT PromotedVT = TLI.getTypeToPromoteTo(Node->getOpcode(), VT.getSimpleVT());
+  assert((VT.isInteger() || VT.getSizeInBits() == PromotedVT.getSizeInBits()) &&
+         "Only integer promotion or bitcasts between types is supported");
+
+  SDValue Vec = Node->getOperand(0);
+  SDValue Mask = Node->getOperand(1);
+  SDValue Passthru = Node->getOperand(2);
+  if (VT.isInteger()) {
+    Vec = DAG.getNode(ISD::ANY_EXTEND, DL, PromotedVT, Vec);
+    Mask = TLI.promoteTargetBoolean(DAG, Mask, PromotedVT);
+    Passthru = DAG.getNode(ISD::ANY_EXTEND, DL, PromotedVT, Passthru);
+  } else {
+    Vec = DAG.getBitcast(PromotedVT, Vec);
+    Passthru = DAG.getBitcast(PromotedVT, Passthru);
+  }
+
+  SDValue Result =
+      DAG.getNode(ISD::VECTOR_COMPRESS, DL, PromotedVT, Vec, Mask, Passthru);
+  Result = VT.isInteger() ? DAG.getNode(ISD::TRUNCATE, DL, VT, Result)
+                          : DAG.getBitcast(VT, Result);
+  Results.push_back(Result);
+}
+
 void VectorLegalizer::Promote(SDNode *Node, SmallVectorImpl<SDValue> &Results) {
   // For a few operations there is a specific concept for promotion based on
   // the operand's type.
@@ -745,6 +783,10 @@ void VectorLegalizer::Promote(SDNode *Node, SmallVectorImpl<SDValue> &Results) {
   case ISD::VECREDUCE_FMINIMUM:
     PromoteFloatVECREDUCE(Node, Results, /*NonArithmetic=*/true);
     return;
+  case ISD::VECTOR_COMPRESS:
+    PromoteVECTOR_COMPRESS(Node, Results);
+    return;
+
   case ISD::FP_ROUND:
   case ISD::FP_EXTEND:
     // These operations are used to do promotion so they can't be promoted
@@ -1124,6 +1166,14 @@ void VectorLegalizer::Expand(SDNode *Node, SmallVectorImpl<SDValue> &Results) {
       return;
     }
     break;
+  case ISD::CLMUL:
+  case ISD::CLMULR:
+  case ISD::CLMULH:
+    if (SDValue Expanded = TLI.expandCLMUL(Node, DAG)) {
+      Results.push_back(Expanded);
+      return;
+    }
+    break;
   case ISD::ROTL:
   case ISD::ROTR:
     if (SDValue Expanded = TLI.expandROT(Node, false /*AllowVectorOps*/, DAG)) {
@@ -1277,6 +1327,24 @@ void VectorLegalizer::Expand(SDNode *Node, SmallVectorImpl<SDValue> &Results) {
     // scalarizing.
     break;
   }
+  case ISD::FPOW: {
+    RTLIB::Libcall LC = RTLIB::getPOW(Node->getValueType(0));
+    if (tryExpandVecMathCall(Node, LC, Results))
+      return;
+
+    // TODO: Try to see if there's a narrower call available to use before
+    // scalarizing.
+    break;
+  }
+  case ISD::FCBRT: {
+    RTLIB::Libcall LC = RTLIB::getCBRT(Node->getValueType(0));
+    if (tryExpandVecMathCall(Node, LC, Results))
+      return;
+
+    // TODO: Try to see if there's a narrower call available to use before
+    // scalarizing.
+    break;
+  }
   case ISD::FMODF: {
     EVT VT = Node->getValueType(0);
     RTLIB::Libcall LC = RTLIB::getMODF(VT);
@@ -1288,6 +1356,10 @@ void VectorLegalizer::Expand(SDNode *Node, SmallVectorImpl<SDValue> &Results) {
   }
   case ISD::VECTOR_COMPRESS:
     Results.push_back(TLI.expandVECTOR_COMPRESS(Node, DAG));
+    return;
+  case ISD::CTTZ_ELTS:
+  case ISD::CTTZ_ELTS_ZERO_POISON:
+    Results.push_back(TLI.expandCttzElts(Node, DAG));
     return;
   case ISD::VECTOR_FIND_LAST_ACTIVE:
     Results.push_back(TLI.expandVectorFindLastActive(Node, DAG));
@@ -1439,7 +1511,7 @@ SDValue VectorLegalizer::ExpandANY_EXTEND_VECTOR_INREG(SDNode *Node) {
 
   return DAG.getNode(
       ISD::BITCAST, DL, VT,
-      DAG.getVectorShuffle(SrcVT, DL, Src, DAG.getUNDEF(SrcVT), ShuffleMask));
+      DAG.getVectorShuffle(SrcVT, DL, Src, DAG.getPOISON(SrcVT), ShuffleMask));
 }
 
 SDValue VectorLegalizer::ExpandSIGN_EXTEND_VECTOR_INREG(SDNode *Node) {
@@ -1524,7 +1596,8 @@ SDValue VectorLegalizer::ExpandBSWAP(SDNode *Node) {
   if (TLI.isShuffleMaskLegal(ShuffleMask, ByteVT)) {
     SDLoc DL(Node);
     SDValue Op = DAG.getNode(ISD::BITCAST, DL, ByteVT, Node->getOperand(0));
-    Op = DAG.getVectorShuffle(ByteVT, DL, Op, DAG.getUNDEF(ByteVT), ShuffleMask);
+    Op = DAG.getVectorShuffle(ByteVT, DL, Op, DAG.getPOISON(ByteVT),
+                              ShuffleMask);
     return DAG.getNode(ISD::BITCAST, DL, VT, Op);
   }
 
@@ -1568,7 +1641,7 @@ SDValue VectorLegalizer::ExpandBITREVERSE(SDNode *Node) {
           TLI.isOperationLegalOrCustomOrPromote(ISD::OR, ByteVT)))) {
       SDLoc DL(Node);
       SDValue Op = DAG.getNode(ISD::BITCAST, DL, ByteVT, Node->getOperand(0));
-      Op = DAG.getVectorShuffle(ByteVT, DL, Op, DAG.getUNDEF(ByteVT),
+      Op = DAG.getVectorShuffle(ByteVT, DL, Op, DAG.getPOISON(ByteVT),
                                 BSWAPMask);
       Op = DAG.getNode(ISD::BITREVERSE, DL, ByteVT, Op);
       Op = DAG.getNode(ISD::BITCAST, DL, VT, Op);
@@ -1910,7 +1983,7 @@ void VectorLegalizer::ExpandUINT_TO_FLOAT(SDNode *Node,
     SDValue UIToFP;
     SDValue Result;
     SDValue TargetZero = DAG.getIntPtrConstant(0, DL, /*isTarget=*/true);
-    EVT FloatVecVT = SrcVT.changeVectorElementType(FPVT);
+    EVT FloatVecVT = SrcVT.changeVectorElementType(*DAG.getContext(), FPVT);
     if (IsStrict) {
       UIToFP = DAG.getNode(ISD::STRICT_UINT_TO_FP, DL, {FloatVecVT, MVT::Other},
                            {Node->getOperand(0), Src});
@@ -2223,7 +2296,7 @@ bool VectorLegalizer::tryExpandVecMathCall(SDNode *Node, RTLIB::Libcall LC,
   // converted to their none strict counterpart.
   assert(!Node->isStrictFPOpcode() && "Unexpected strict fp operation!");
 
-  RTLIB::LibcallImpl LCImpl = TLI.getLibcallImpl(LC);
+  RTLIB::LibcallImpl LCImpl = DAG.getLibcalls().getLibcallImpl(LC);
   if (LCImpl == RTLIB::Unsupported)
     return false;
 
