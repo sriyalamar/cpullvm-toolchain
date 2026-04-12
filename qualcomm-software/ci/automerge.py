@@ -112,6 +112,8 @@ def merge_commit(
     # that by not checking the exist status and validating that a merge is in
     # progress after `git merge` runs.
     #git_repo.run_cmd(["merge", commit_hash, "--no-commit", "--no-ff"], check=False)
+    
+    commit_hash = commit_hash.strip()   # ✅ FIX #1
     git_repo.run_cmd(["fetch", REMOTE_NAME, commit_hash], check=False)
     git_repo.run_cmd(["cherry-pick", commit_hash], check=False)
     if not is_merge_in_progress(git_repo):
