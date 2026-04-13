@@ -173,18 +173,22 @@ def process_conflict(
     create_pull_request(git_repo, to_branch)
 
 
-def get_merge_commit_list(git_repo: Git, from_branch: str, to_branch: str, start_commit: Optional[str] = None) -> list[str]:
+def get_merge_commit_list(git_repo: Git, from_branch: str, to_branch: str) -> list[str]:
     logger.info(
         "Calculating list of commits to be merged from %s to %s", from_branch, to_branch
     )
     
-    last_sync_sha = "24799f17429838bd17c16c43e7ed0e85cff78fd7"
-    commit_list_output = git_repo.run_cmd(["rev-list","--reverse",f"{last_sync_sha}..{from_branch}",])
-
-    if not commit_list_output.strip():
+    merge_base_output = git_repo.run_cmd(["merge-base", from_branch, to_branch])
+    merge_base_commit = merge_base_output.strip()
+    log_output = git_repo.run_cmd(
+        ["log", f"{merge_base_commit}..{from_branch}", "--pretty=format:%H"]
+    )
+    commit_list = log_output.strip()
+    if not commit_list:
         logger.info("No commits to be merged")
         return []
-    commit_list = commit_list_output.splitlines("\n")
+    commit_list = commit_list.split("\n")
+    commit_list.reverse()
     logger.info("Found %d commits to be merged", len(commit_list))
     logger.info("First commit getting synced : %s", commit_list[0])
     logger.info("Last  commit getting synced : %s", commit_list[-1])
@@ -247,11 +251,6 @@ def main():
         action="store_true",
         help="Print verbose log messages during automerge run",
     )
-    arg_parser.add_argument(
-        "--start-commit",
-        metavar="COMMIT_HASH",
-        help="Optional commit hash to start from instead of merge-base",
-    )
     args = arg_parser.parse_args()
 
     if args.verbose:
@@ -273,7 +272,7 @@ def main():
             ignored_paths = ignored_paths_file.read().splitlines()
 
         merge_commits = get_merge_commit_list(
-            git_repo, args.from_branch, args.to_branch, args.start_commit)
+            git_repo, args.from_branch, args.to_branch)
         for commit_hash in merge_commits:
             merge_commit(
                 git_repo,
