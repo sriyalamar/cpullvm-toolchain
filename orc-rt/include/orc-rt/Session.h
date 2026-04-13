@@ -27,7 +27,7 @@
 #include "orc-rt-c/WrapperFunction.h"
 
 #include <cassert>
-#include <future>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -163,6 +163,10 @@ public:
   Session(Session &&) = delete;
   Session &operator=(Session &&) = delete;
 
+  /// Destroy the session object.
+  ///
+  /// This will trigger shutdown if it has not happened already. Destruction
+  /// will block until the Session lifecycle completes.
   ~Session();
 
   /// Provides information about the host process that the Session is running
@@ -229,15 +233,6 @@ public:
   ///
   /// Runs shutdown on registered resources in reverse order.
   void shutdown(OnShutdownFn OnShutdown = {});
-
-  /// Initiate session shutdown and block until complete.
-  ///
-  /// WARNING: Never call waitForShutdown from an on-detach or on-shutdown
-  ///          handler: this will cause a deadlock, since the Session can't
-  ///          shut down until all such handlers return. (The Session::shutdown
-  ///          method can be called from a handler to initiate shutdown,
-  ///          however).
-  void waitForShutdown();
 
   /// Register a callback to be called when the Session detaches from the
   /// controller. If the Session has already detached, the callback will be
@@ -339,6 +334,7 @@ private:
   ErrorReporterFn ReportError;
 
   mutable std::mutex M;
+  std::condition_variable CV;
   State CurrentState = State::Start;
   State TargetState = State::None;
   std::vector<std::unique_ptr<Service>> Services;
