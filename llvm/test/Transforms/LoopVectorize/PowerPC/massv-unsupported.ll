@@ -108,3 +108,5 @@ for.body:
 for.end:
   ret void
 }
+
+attributes #0 = { nounwind }

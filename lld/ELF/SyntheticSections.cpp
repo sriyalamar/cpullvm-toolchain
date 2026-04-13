@@ -4564,7 +4564,7 @@ template <class ELFT> void elf::createSyntheticSections(Ctx &ctx) {
           ctx, relaDynName, threadCount);
     else
       part.relaDyn = std::make_unique<RelocationSection<ELFT>>(
-          ctx, relaDynName, /*combreloc=*/true, threadCount);
+          ctx, relaDynName, ctx.arg.zCombreloc, threadCount);
 
     if (ctx.hasDynsym) {
       add(*part.dynSymTab);

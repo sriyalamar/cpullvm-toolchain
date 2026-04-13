@@ -66,6 +66,7 @@ struct CGPassBuilderOption {
 
   bool DisableLSR = false;
   bool DisableCGP = false;
+  bool DisableMergeICmps = false;
   bool DisablePartialLibcallInlining = false;
   bool DisableConstantHoisting = false;
   bool DisableSelectOptimize = true;

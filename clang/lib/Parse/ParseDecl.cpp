@@ -4093,28 +4093,7 @@ void Parser::ParseDeclarationSpecifiers(
       break;
     case tok::kw_auto:
       if (getLangOpts().CPlusPlus11 || getLangOpts().C23) {
-        auto MayBeTypeSpecifier = [&]() {
-          // In pre-C23 C, auto can be used as a storage-class specifier.
-          // C23 removes auto from the storage-class specifiers and repurposes
-          // it for type inference (6.7.10).
-          if (getLangOpts().C23 && DS.hasTypeSpecifier() &&
-              DS.getTypeSpecType() != DeclSpec::TST_auto)
-            return true;
-
-          unsigned I = 1;
-          while (true) {
-            const Token &T = GetLookAheadToken(I);
-            if (isKnownToBeTypeSpecifier(T))
-              return true;
-
-            if (getLangOpts().C23 && isTypeSpecifierQualifier(T))
-              ++I;
-            else
-              return false;
-          }
-        };
-
-        if (MayBeTypeSpecifier()) {
+        if (isKnownToBeTypeSpecifier(GetLookAheadToken(1))) {
           isInvalid = DS.SetStorageClassSpec(Actions, DeclSpec::SCS_auto, Loc,
                                              PrevSpec, DiagID, Policy);
           if (!isInvalid && !getLangOpts().C23)
@@ -5596,19 +5575,13 @@ bool Parser::isKnownToBeTypeSpecifier(const Token &Tok) const {
     // enum-specifier
   case tok::kw_enum:
 
-  case tok::kw_typeof:
-  case tok::kw_typeof_unqual:
-
-  // C11 _Atomic
-  case tok::kw__Atomic:
-
     // typedef-name
   case tok::annot_typename:
     return true;
   }
 }
 
-bool Parser::isTypeSpecifierQualifier(const Token &Tok) {
+bool Parser::isTypeSpecifierQualifier() {
   switch (Tok.getKind()) {
   default: return false;
 
@@ -5621,9 +5594,9 @@ bool Parser::isTypeSpecifierQualifier(const Token &Tok) {
     // recurse to handle whatever we get.
     if (TryAnnotateTypeOrScopeToken())
       return true;
-    if (getCurToken().is(tok::identifier))
+    if (Tok.is(tok::identifier))
       return false;
-    return isTypeSpecifierQualifier(getCurToken());
+    return isTypeSpecifierQualifier();
 
   case tok::coloncolon:   // ::foo::bar
     if (NextToken().is(tok::kw_new) ||    // ::new
@@ -5632,7 +5605,7 @@ bool Parser::isTypeSpecifierQualifier(const Token &Tok) {
 
     if (TryAnnotateTypeOrScopeToken())
       return true;
-    return isTypeSpecifierQualifier(getCurToken());
+    return isTypeSpecifierQualifier();
 
     // GNU attributes support.
   case tok::kw___attribute:

@@ -1557,8 +1557,7 @@ SectionPiece &MergeInputSection::getSectionPiece(uint64_t offset) {
   if (!(flags & SHF_STRINGS))
     return pieces[offset / entsize];
   return partition_point(
-      pieces,
-      [=](const SectionPiece &p) { return p.inputOff <= offset; })[-1];
+      pieces, [=](SectionPiece p) { return p.inputOff <= offset; })[-1];
 }
 
 // Return the offset in an output section for a given input offset.

@@ -203,8 +203,8 @@ private:
   void computeAndReportProfileStaleness();
   void UpdateWithSalvagedProfiles();
 
-  LocToLocMap &getIRToProfileLocationMap(const FunctionSamples &FS) {
-    return FuncMappings[FS.getFuncName()];
+  LocToLocMap &getIRToProfileLocationMap(const Function &F) {
+    return FuncMappings[FunctionSamples::getCanonicalFnName(F.getName())];
   }
   void distributeIRToProfileLocationMap();
   void distributeIRToProfileLocationMap(FunctionSamples &FS);

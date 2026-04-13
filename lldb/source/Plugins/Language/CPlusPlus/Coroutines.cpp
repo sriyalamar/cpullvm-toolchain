@@ -11,7 +11,6 @@
 #include "Plugins/TypeSystem/Clang/TypeSystemClang.h"
 #include "lldb/Symbol/Function.h"
 #include "lldb/Symbol/VariableList.h"
-#include "llvm/Support/ErrorExtras.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -202,7 +201,8 @@ StdlibCoroutineHandleSyntheticFrontEnd::GetIndexOfChildWithName(
       return idx;
   }
 
-  return llvm::createStringErrorV("type has no child named '{0}'", name);
+  return llvm::createStringError("Type has no child named '%s'",
+                                 name.AsCString());
 }
 
 SyntheticChildrenFrontEnd *

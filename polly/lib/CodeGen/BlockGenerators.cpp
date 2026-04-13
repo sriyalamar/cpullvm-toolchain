@@ -42,11 +42,10 @@ static cl::opt<bool, true> DebugPrintingX(
     cl::desc("Add printf calls that show the values loaded/stored."),
     cl::location(PollyDebugPrinting), cl::Hidden, cl::cat(PollyCategory));
 
-bool TraceStmts;
-static cl::opt<bool, true> TraceStmtsX(
+static cl::opt<bool> TraceStmts(
     "polly-codegen-trace-stmts",
     cl::desc("Add printf calls that print the statement being executed"),
-    cl::location(TraceStmts), cl::Hidden, cl::cat(PollyCategory));
+    cl::Hidden, cl::cat(PollyCategory));
 
 static cl::opt<bool> TraceScalars(
     "polly-codegen-trace-scalars",

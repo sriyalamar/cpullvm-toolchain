@@ -23,7 +23,6 @@
 #include "lldb/DataFormatters/FormatterBytecode.h"
 #include "lldb/Utility/StructuredData.h"
 #include "lldb/ValueObject/ValueObject.h"
-#include "llvm/Support/ErrorExtras.h"
 
 namespace lldb_private {
 class SyntheticChildrenFrontEnd {
@@ -53,7 +52,8 @@ public:
   /// subscripting behavior - for example a sparse array, disable automatic
   /// subscripting with TypeOptions::eTypeOptionCustomSubscripting.
   virtual llvm::Expected<size_t> GetIndexOfChildWithName(ConstString name) {
-    return llvm::createStringErrorV("Type has no child named '{0}'", name);
+    return llvm::createStringError("Type has no child named '%s'",
+                                   name.AsCString());
   }
 
   /// This function is assumed to always succeed and if it fails, the front-end
@@ -120,7 +120,8 @@ public:
   lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override { return nullptr; }
 
   llvm::Expected<size_t> GetIndexOfChildWithName(ConstString name) override {
-    return llvm::createStringErrorV("Type has no child named '{0}'", name);
+    return llvm::createStringError("Type has no child named '%s'",
+                                   name.AsCString());
   }
 
   lldb::ChildCacheState Update() override {

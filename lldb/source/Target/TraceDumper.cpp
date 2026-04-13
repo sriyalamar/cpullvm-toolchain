@@ -30,7 +30,7 @@ static std::optional<const char *> ToOptionalString(const char *s) {
 static const char *GetModuleName(const SymbolContext &sc) {
   if (!sc.module_sp)
     return nullptr;
-  return sc.module_sp->GetFileSpec().GetFilename().AsCString(nullptr);
+  return sc.module_sp->GetFileSpec().GetFilename().AsCString();
 }
 
 /// \return
@@ -245,7 +245,7 @@ private:
     else if (!sc.function && !sc.symbol)
       m_s << module_name << "`(none)";
     else
-      m_s << module_name << "`" << sc.GetFunctionName();
+      m_s << module_name << "`" << sc.GetFunctionName().AsCString();
   }
 
   void DumpFunctionCallTree(const TraceDumper::FunctionCall &function_call) {
@@ -377,8 +377,7 @@ public:
       m_j.attribute("module", ToOptionalString(GetModuleName(item)));
       m_j.attribute(
           "symbol",
-          ToOptionalString(
-              item.symbol_info->sc.GetFunctionName().AsCString(nullptr)));
+          ToOptionalString(item.symbol_info->sc.GetFunctionName().AsCString()));
 
       if (lldb::InstructionSP instruction = item.symbol_info->instruction) {
         ExecutionContext exe_ctx = item.symbol_info->exe_ctx;

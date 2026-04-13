@@ -72,8 +72,12 @@ Error AttachRequestHandler::Run(const AttachRequestArguments &args) const {
     target = dap.CreateTarget(error);
   }
 
-  if (target.IsValid())
-    dap.SetTarget(target);
+  // Fallback to the 'dummy' target if we failed to create a real target, so we
+  // can try to attach.
+  if (!target.IsValid())
+    target = dap.debugger.GetDummyTarget();
+
+  dap.SetTarget(target);
 
   // Run any pre run LLDB commands the user specified in the launch.json
   if (Error err = dap.RunPreRunCommands())

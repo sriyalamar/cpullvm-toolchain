@@ -57,6 +57,7 @@ static_library("CodeGen") {
     "EdgeBundles.cpp",
     "ExecutionDomainFix.cpp",
     "ExpandIRInsts.cpp",
+    "ExpandMemCmp.cpp",
     "ExpandPostRAPseudos.cpp",
     "ExpandReductions.cpp",
     "ExpandVectorPredication.cpp",

@@ -1652,8 +1652,8 @@ void ObjectFileMachO::ProcessSegmentCommand(
         log->Printf(
             "Installing dSYM's %s segment file address over ObjectFile's "
             "so symbol table/debug info resolves correctly for %s",
-            const_segname.AsCString(""),
-            module_sp->GetFileSpec().GetFilename().AsCString(""));
+            const_segname.AsCString(),
+            module_sp->GetFileSpec().GetFilename().AsCString());
       }
 
       // Make sure we've parsed the symbol table from the ObjectFile before
@@ -1916,7 +1916,7 @@ public:
         SectionSP section_sp(m_section_list->FindSectionByID(n_sect));
         m_section_infos[n_sect].section_sp = section_sp;
         if (section_sp) {
-          m_section_infos[n_sect].vm_range.SetRangeBase(
+          m_section_infos[n_sect].vm_range.SetBaseAddress(
               section_sp->GetFileAddress());
           m_section_infos[n_sect].vm_range.SetByteSize(
               section_sp->GetByteSize());
@@ -1936,7 +1936,8 @@ public:
         // Symbol is in section.
         return m_section_infos[n_sect].section_sp;
       } else if (m_section_infos[n_sect].vm_range.GetByteSize() == 0 &&
-                 m_section_infos[n_sect].vm_range.GetRangeBase() == file_addr) {
+                 m_section_infos[n_sect].vm_range.GetBaseAddress() ==
+                     file_addr) {
         // Symbol is in section with zero size, but has the same start address
         // as the section. This can happen with linker symbols (symbols that
         // start with the letter 'l' or 'L'.
@@ -1950,7 +1951,7 @@ protected:
   struct SectionInfo {
     SectionInfo() : vm_range(), section_sp() {}
 
-    Range<addr_t, addr_t> vm_range;
+    VMRange vm_range;
     SectionSP section_sp;
   };
   SectionList *m_section_list;
@@ -2134,7 +2135,7 @@ static SymbolType GetSymbolType(const char *&symbol_name,
                                 const SectionSP &symbol_section) {
   SymbolType type = eSymbolTypeInvalid;
 
-  const char *symbol_sect_name = symbol_section->GetName().AsCString(nullptr);
+  const char *symbol_sect_name = symbol_section->GetName().AsCString();
   if (symbol_section->IsDescendant(text_section_sp.get())) {
     if (symbol_section->IsClear(S_ATTR_PURE_INSTRUCTIONS |
                                 S_ATTR_SELF_MODIFYING_CODE |
@@ -3335,7 +3336,7 @@ void ObjectFileMachO::ParseSymtab(Symtab &symtab) {
 
                           if (type == eSymbolTypeInvalid) {
                             const char *symbol_sect_name =
-                                symbol_section->GetName().AsCString(nullptr);
+                                symbol_section->GetName().AsCString();
                             if (symbol_section->IsDescendant(
                                     text_section_sp.get())) {
                               if (symbol_section->IsClear(
@@ -3807,11 +3808,9 @@ void ObjectFileMachO::ParseSymtab(Symtab &symtab) {
               // This is usually the second N_SO entry that contains just the
               // filename, so here we combine it with the first one if we are
               // minimizing the symbol table
-              llvm::StringRef so_path = sym[sym_idx - 1]
-                                            .GetMangled()
-                                            .GetDemangledName()
-                                            .GetStringRef();
-              if (!so_path.empty()) {
+              const char *so_path =
+                  sym[sym_idx - 1].GetMangled().GetDemangledName().AsCString();
+              if (so_path && so_path[0]) {
                 std::string full_so_path(so_path);
                 const size_t double_slash_pos = full_so_path.find("//");
                 if (double_slash_pos != std::string::npos) {
@@ -4095,7 +4094,7 @@ void ObjectFileMachO::ParseSymtab(Symtab &symtab) {
 
             if (type == eSymbolTypeInvalid) {
               const char *symbol_sect_name =
-                  symbol_section->GetName().AsCString(nullptr);
+                  symbol_section->GetName().AsCString();
               if (symbol_section->IsDescendant(text_section_sp.get())) {
                 if (symbol_section->IsClear(S_ATTR_PURE_INSTRUCTIONS |
                                             S_ATTR_SELF_MODIFYING_CODE |
@@ -4516,11 +4515,11 @@ void ObjectFileMachO::ParseSymtab(Symtab &symtab) {
                   ++sym_idx;
                 }
               } else {
-                LLDB_LOGF(log,
-                          "warning: symbol stub referencing symbol table "
-                          "symbol %u that isn't in our minimal symbol table, "
-                          "fix this!!!",
-                          stub_sym_id);
+                if (log)
+                  log->Warning("symbol stub referencing symbol table symbol "
+                               "%u that isn't in our minimal symbol table, "
+                               "fix this!!!",
+                               stub_sym_id);
               }
             }
           }
@@ -6037,10 +6036,11 @@ bool ObjectFileMachO::SetLoadAddress(Target &target, lldb::addr_t value,
       // sections that size on disk (to avoid __PAGEZERO) and load them
       SectionSP section_sp(section_list->GetSectionAtIndex(sect_idx));
       if (SectionIsLoadable(section_sp.get())) {
-        LLDB_LOG(
-            log,
-            "ObjectFileMachO::SetLoadAddress segment '{0}' load addr is {1:x}",
-            section_sp->GetName(), section_sp->GetFileAddress() + value);
+        LLDB_LOGF(log,
+                  "ObjectFileMachO::SetLoadAddress segment '%s' load addr is "
+                  "0x%" PRIx64,
+                  section_sp->GetName().AsCString(),
+                  section_sp->GetFileAddress() + value);
         if (target.SetSectionLoadAddress(section_sp,
                                          section_sp->GetFileAddress() + value,
                                          warn_multiple))
@@ -6060,10 +6060,10 @@ bool ObjectFileMachO::SetLoadAddress(Target &target, lldb::addr_t value,
             CalculateSectionLoadAddressForMemoryImage(
                 value, mach_header_section, section_sp.get());
         if (section_load_addr != LLDB_INVALID_ADDRESS) {
-          LLDB_LOG(log,
-                   "ObjectFileMachO::SetLoadAddress segment '{0}' load addr is "
-                   "{1:x}",
-                   section_sp->GetName(), section_load_addr);
+          LLDB_LOGF(log,
+                    "ObjectFileMachO::SetLoadAddress segment '%s' load addr is "
+                    "0x%" PRIx64,
+                    section_sp->GetName().AsCString(), section_load_addr);
           if (target.SetSectionLoadAddress(section_sp, section_load_addr,
                                            warn_multiple))
             ++num_loaded_sections;
@@ -6222,7 +6222,7 @@ CreateAllImageInfosPayload(const lldb::ProcessSP &process_sp,
         // is not guaranteed to be nul-terminated if all 16 characters are
         // used.
         // coverity[buffer_size_warning]
-        strncpy(seg_vmaddr.segname, name.AsCString(nullptr),
+        strncpy(seg_vmaddr.segname, name.AsCString(),
                 sizeof(seg_vmaddr.segname));
         seg_vmaddr.vmaddr = vmaddr;
         seg_vmaddr.unused = 0;
@@ -6406,7 +6406,7 @@ bool ObjectFileMachO::SaveCore(const lldb::ProcessSP &process_sp,
           segment_load_commands.push_back(segment);
         }
 
-        StreamString buffer(Stream::eBinary, byte_order);
+        StreamString buffer(Stream::eBinary, addr_byte_size, byte_order);
 
         llvm::MachO::mach_header_64 mach_header;
         mach_header.magic = addr_byte_size == 8 ? MH_MAGIC_64 : MH_MAGIC;
@@ -6426,6 +6426,7 @@ bool ObjectFileMachO::SaveCore(const lldb::ProcessSP &process_sp,
         std::vector<StreamString> LC_THREAD_datas(num_threads);
         for (auto &LC_THREAD_data : LC_THREAD_datas) {
           LC_THREAD_data.GetFlags().Set(Stream::eBinary);
+          LC_THREAD_data.SetAddressByteSize(addr_byte_size);
           LC_THREAD_data.SetByteOrder(byte_order);
         }
         for (uint32_t thread_idx = 0; thread_idx < num_threads; ++thread_idx) {
@@ -6510,7 +6511,7 @@ bool ObjectFileMachO::SaveCore(const lldb::ProcessSP &process_sp,
         // Add "addrable bits" LC_NOTE when an address mask is available
         if (address_mask != LLDB_INVALID_ADDRESS_MASK) {
           std::unique_ptr<LCNoteEntry> addrable_bits_lcnote_up(
-              new LCNoteEntry(byte_order));
+              new LCNoteEntry(addr_byte_size, byte_order));
           addrable_bits_lcnote_up->name = "addrable bits";
           addrable_bits_lcnote_up->payload_file_offset = file_offset;
           int bits = std::bitset<64>(~address_mask).count();
@@ -6528,7 +6529,7 @@ bool ObjectFileMachO::SaveCore(const lldb::ProcessSP &process_sp,
 
         // Add "process metadata" LC_NOTE
         std::unique_ptr<LCNoteEntry> thread_extrainfo_lcnote_up(
-            new LCNoteEntry(byte_order));
+            new LCNoteEntry(addr_byte_size, byte_order));
         thread_extrainfo_lcnote_up->name = "process metadata";
         thread_extrainfo_lcnote_up->payload_file_offset = file_offset;
 
@@ -6555,7 +6556,7 @@ bool ObjectFileMachO::SaveCore(const lldb::ProcessSP &process_sp,
 
         // Add "all image infos" LC_NOTE
         std::unique_ptr<LCNoteEntry> all_image_infos_lcnote_up(
-            new LCNoteEntry(byte_order));
+            new LCNoteEntry(addr_byte_size, byte_order));
         all_image_infos_lcnote_up->name = "all image infos";
         all_image_infos_lcnote_up->payload_file_offset = file_offset;
         file_offset = CreateAllImageInfosPayload(

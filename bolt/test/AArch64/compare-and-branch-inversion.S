@@ -7,7 +7,6 @@
 
 # RUN: %clang %cflags -march=armv9-a+cmpbr -Wl,-q %s -o %t
 # RUN: link_fdata --no-lbr %s %t %t.fdata
-# RUN: llvm-strip --strip-unneeded %t
 # RUN: llvm-bolt -v=1 %t -o %t.bolt --data %t.fdata --reorder-blocks=ext-tsp --compact-code-model \
 # RUN:   | FileCheck %s --check-prefix=BOLT-INFO
 # RUN: llvm-objdump -d %t.bolt | FileCheck %s
@@ -31,8 +30,10 @@ immediate_increment:
 
 # CHECK: <immediate_increment>:
 # CHECK-NEXT:            {{.*}} cblt x0, #0x1, 0x[[ADDR0:[0-9a-f]+]] <{{.*}}>
+# CHECK:      <.exit0>:
 # CHECK-NEXT:            {{.*}} mov  x0, #0x2 // =2
 # CHECK-NEXT:            {{.*}} ret
+# CHECK:      <.cold0>:
 # CHECK-NEXT: [[ADDR0]]: {{.*}} mov x0, #0x1 // =1
 # CHECK-NEXT:            {{.*}} ret
 
@@ -53,8 +54,10 @@ immediate_decrement:
 
 # CHECK: <immediate_decrement>:
 # CHECK-NEXT:            {{.*}} cbhi x0, #0x0, 0x[[ADDR1:[0-9a-f]+]] <{{.*}}>
+# CHECK:      <.exit1>:
 # CHECK-NEXT:            {{.*}} mov  x0, #0x2 // =2
 # CHECK-NEXT:            {{.*}} ret
+# CHECK:      <.cold1>:
 # CHECK-NEXT: [[ADDR1]]: {{.*}} mov x0, #0x1 // =1
 # CHECK-NEXT:            {{.*}} ret
 
@@ -75,8 +78,10 @@ register_swap:
 
 # CHECK: <register_swap>:
 # CHECK-NEXT:            {{.*}} cbgt x1, x0, 0x[[ADDR2:[0-9a-f]+]] <{{.*}}>
+# CHECK:      <.exit2>:
 # CHECK-NEXT:            {{.*}} mov  x0, #0x2 // =2
 # CHECK-NEXT:            {{.*}} ret
+# CHECK:      <.cold2>:
 # CHECK-NEXT: [[ADDR2]]: {{.*}} mov x0, #0x1 // =1
 # CHECK-NEXT:            {{.*}} ret
 
@@ -100,8 +105,10 @@ irreversible:
 # CHECK: <irreversible>:
 # CHECK-NEXT:            {{.*}} cbgt x0, #0x3f, 0x[[ADDR3:[0-9a-f]+]] <{{.*}}>
 # CHECK-NEXT:            {{.*}} b               0x[[ADDR4:[0-9a-f]+]] <{{.*}}>
+# CHECK:      <.exit3>:
 # CHECK-NEXT: [[ADDR3]]: {{.*}} mov  x0, #0x2 // =2
 # CHECK-NEXT:            {{.*}} ret
+# CHECK:      <.cold3>:
 # CHECK-NEXT: [[ADDR4]]: {{.*}} mov x0, #0x1 // =1
 # CHECK-NEXT:            {{.*}} ret
 

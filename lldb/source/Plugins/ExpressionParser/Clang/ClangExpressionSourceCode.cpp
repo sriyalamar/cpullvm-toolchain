@@ -160,13 +160,13 @@ static void AddMacros(const DebugMacros *dm, CompileUnit *comp_unit,
     switch (entry.GetType()) {
     case DebugMacroEntry::DEFINE:
       if (state.IsValidEntry(entry.GetLineNumber()))
-        stream.Format("#define {0}\n", entry.GetMacroString());
+        stream.Printf("#define %s\n", entry.GetMacroString().AsCString());
       else
         return;
       break;
     case DebugMacroEntry::UNDEF:
       if (state.IsValidEntry(entry.GetLineNumber()))
-        stream.Format("#undef {0}\n", entry.GetMacroString());
+        stream.Printf("#undef %s\n", entry.GetMacroString().AsCString());
       else
         return;
       break;
@@ -359,7 +359,7 @@ void ClangExpressionSourceCode::AddLocalVariableDecls(StreamString &stream,
     if ((var_name == "self" || var_name == "_cmd") && is_objc)
       continue;
 
-    stream.Format("using $__lldb_local_vars::{0};\n", var_name);
+    stream.Printf("using $__lldb_local_vars::%s;\n", var_name.AsCString());
   }
 }
 

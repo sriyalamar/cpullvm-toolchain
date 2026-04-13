@@ -798,9 +798,7 @@ template <typename T> LIBC_INLINE static constexpr FPType get_fp_type() {
       return FPType::IEEE754_Binary64;
     else if constexpr (LDBL_MANT_DIG == 64)
       return FPType::X86_Binary80;
-    // TODO: properly treat double-double type.
-    // else if constexpr (LDBL_MANT_DIG == 113)
-    else
+    else if constexpr (LDBL_MANT_DIG == 113)
       return FPType::IEEE754_Binary128;
   }
 #if defined(LIBC_TYPES_HAS_FLOAT16)

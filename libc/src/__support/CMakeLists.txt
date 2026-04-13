@@ -369,23 +369,15 @@ add_header_library(
     libc.src.__support.macros.properties.types
 )
 
-if(LIBC_COPT_USE_C_ASSERT OR NOT LLVM_LIBC_FULL_BUILD)
-  add_header_library(
-    libc_assert
-    HDRS
-      libc_assert.h
-  )
-else()
-  add_header_library(
-    libc_assert
-    HDRS
-      libc_assert.h
-    DEPENDS
-      .integer_to_string
-      libc.src.__support.OSUtil.osutil
-      libc.src.__support.macros.optimization
-  )
-endif()
+add_header_library(
+  libc_assert
+  HDRS
+    libc_assert.h
+  DEPENDS
+    .integer_to_string
+    libc.src.__support.OSUtil.osutil
+    libc.src.__support.macros.optimization
+)
 
 add_header_library(
   hash
@@ -452,8 +444,12 @@ add_subdirectory(fixed_point)
 
 add_subdirectory(time)
 
-add_subdirectory(wchar)
-add_subdirectory(wctype)
+# Requires access to uchar header which is not on macos
+# Therefore, cannot currently build this on macos in overlay mode
+if(NOT (LIBC_TARGET_OS_IS_DARWIN))
+  add_subdirectory(wchar)
+  add_subdirectory(wctype)
+endif()
 
 add_subdirectory(math)
 if(LIBC_COMPILER_HAS_EXT_VECTOR_TYPE)

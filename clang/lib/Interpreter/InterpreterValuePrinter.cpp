@@ -78,7 +78,7 @@ static std::string QualTypeToString(ASTContext &Ctx, QualType QT) {
       !NonRefTy->isMemberPointerType())
     return Canon.getAsString(Ctx.getPrintingPolicy());
 
-  if (const auto *TDTy = dyn_cast<TypedefType>(Canon)) {
+  if (const auto *TDTy = dyn_cast<TypedefType>(NonRefTy)) {
     // FIXME: TemplateSpecializationType & SubstTemplateTypeParmType checks
     // are predominately to get STL containers to print nicer and might be
     // better handled in GetFullyQualifiedName.
@@ -87,12 +87,13 @@ static std::string QualTypeToString(ASTContext &Ctx, QualType QT) {
     // std::vector<Type>::value_type is a SubstTemplateTypeParmType
     //
     QualType SSDesugar = TDTy->getLocallyUnqualifiedSingleStepDesugaredType();
-    if (llvm::isa<SubstTemplateTypeParmType>(SSDesugar) ||
-        llvm::isa<TemplateSpecializationType>(SSDesugar))
+    if (llvm::isa<SubstTemplateTypeParmType>(SSDesugar))
       return GetFullTypeName(Ctx, Canon);
-    return DeclTypeToString(Canon, TDTy->getDecl());
+    else if (llvm::isa<TemplateSpecializationType>(SSDesugar))
+      return GetFullTypeName(Ctx, NonRefTy);
+    return DeclTypeToString(NonRefTy, TDTy->getDecl());
   }
-  return GetFullTypeName(Ctx, Canon);
+  return GetFullTypeName(Ctx, NonRefTy);
 }
 
 static std::string EnumToString(const Value &V) {

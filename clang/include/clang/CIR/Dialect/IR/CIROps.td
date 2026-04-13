@@ -520,25 +520,7 @@ def CIR_MemOrder : CIR_I32EnumAttr<
 
 def CIR_SyncScopeKind : CIR_I32EnumAttr<"SyncScopeKind", "sync scope kind", [
   I32EnumAttrCase<"SingleThread", 0, "single_thread">,
-  I32EnumAttrCase<"System", 1, "system">,
-  I32EnumAttrCase<"Device", 2, "device">,
-  I32EnumAttrCase<"Workgroup", 3, "workgroup">,
-  I32EnumAttrCase<"Wavefront", 4, "wavefront">,
-  I32EnumAttrCase<"Cluster", 5, "cluster">,
-
-  // HIP sync scopes
-  I32EnumAttrCase<"HIPSingleThread", 6, "hip_single_thread">,
-  I32EnumAttrCase<"HIPSystem", 7, "hip_system">,
-  I32EnumAttrCase<"HIPAgent", 8, "hip_agent">,
-  I32EnumAttrCase<"HIPWorkgroup", 9, "hip_workgroup">,
-  I32EnumAttrCase<"HIPWavefront", 10, "hip_wavefront">,
-  I32EnumAttrCase<"HIPCluster", 11, "hip_cluster">,
-
-  // OpenCL sync scopes
-  I32EnumAttrCase<"OpenCLWorkGroup", 12, "opencl_work_group">,
-  I32EnumAttrCase<"OpenCLDevice", 13, "opencl_device">,
-  I32EnumAttrCase<"OpenCLAllSVMDevices", 14, "opencl_all_svm_devices">,
-  I32EnumAttrCase<"OpenCLSubGroup", 15, "opencl_sub_group">,
+  I32EnumAttrCase<"System", 1, "system">
 ]>;
 
 //===----------------------------------------------------------------------===//
@@ -2845,9 +2827,9 @@ def CIR_GlobalOp : CIR_Op<"global", [
   // TODO: sym_visibility can possibly be represented by implementing the
   // necessary Symbol's interface in terms of linkage instead.
   let arguments = (ins SymbolNameAttr:$sym_name,
-                       DefaultValuedProp<
-                        EnumProp<CIR_VisibilityKind>,
-                        "cir::VisibilityKind::Default"
+                       DefaultValuedAttr<
+                        CIR_VisibilityAttr,
+                        "VisibilityKind::Default"
                        >:$global_visibility,
                        OptionalAttr<StrAttr>:$sym_visibility,
                        TypeAttr:$sym_type,
@@ -2855,21 +2837,19 @@ def CIR_GlobalOp : CIR_Op<"global", [
                        OptionalAttr<MemorySpaceAttrInterface>:$addr_space,
                        OptionalAttr<CIR_TLSModel>:$tls_model,
                        OptionalAttr<AnyAttr>:$initial_value,
-                       UnitProp:$comdat,
-                       UnitProp:$constant,
-                       UnitProp:$dso_local,
+                       UnitAttr:$comdat,
+                       UnitAttr:$constant,
+                       UnitAttr:$dso_local,
                        OptionalAttr<CIR_StaticLocalGuardAttr>:$static_local_guard,
                        OptionalAttr<I64Attr>:$alignment,
-                       OptionalAttr<ASTVarDeclInterface>:$ast,
-                       OptionalAttr<StrAttr>:$section
-                       );
+                       OptionalAttr<ASTVarDeclInterface>:$ast);
 
   let regions = (region MaxSizedRegion<1>:$ctorRegion,
                         MaxSizedRegion<1>:$dtorRegion);
 
   let assemblyFormat = [{
     ($sym_visibility^)?
-    ($global_visibility^)?
+    (`` $global_visibility^)?
     (`constant` $constant^)?
     $linkage
     (`comdat` $comdat^)?
@@ -2920,10 +2900,6 @@ def CIR_GlobalOp : CIR_Op<"global", [
 
     void setupRegionInitializedLLVMGlobalOp(
         cir::GlobalOp op, mlir::ConversionPatternRewriter &rewriter) const;
-
-    llvm::SmallVector<mlir::NamedAttribute> lowerGlobalAttributes(
-        cir::GlobalOp op,
-        mlir::ConversionPatternRewriter &rewriter) const;
 
     mutable mlir::LLVM::ComdatOp comdatOp = nullptr;
     mlir::SymbolRefAttr getComdatAttr(cir::GlobalOp &op,
@@ -3685,10 +3661,7 @@ def CIR_FuncOp : CIR_Op<"func", [
 
   let arguments = (ins
     SymbolNameAttr:$sym_name,
-    DefaultValuedProp<
-      EnumProp<CIR_VisibilityKind>,
-      "cir::VisibilityKind::Default"
-    >:$global_visibility,
+    CIR_VisibilityAttr:$global_visibility,
     TypeAttrOf<CIR_FuncType>:$function_type,
     UnitAttr:$builtin,
     UnitAttr:$coroutine,
@@ -4167,32 +4140,21 @@ def CIR_CopyOp : CIR_Op<"copy",[
 
     The `volatile` keyword indicates that the operation is volatile.
 
-    The `skip_tail_padding` keyword indicates that only the data bytes should
-    be copied, excluding any tail padding. This is used when copying
-    potentially-overlapping subobjects where the tail padding might be occupied
-    by other objects (e.g. fields marked with `[[no_unique_address]]`). This
-    is only valid when the pointee type is a record type.
-
     Examples:
 
     ```mlir
       // Copying contents from one record to another:
       cir.copy %0 to %1 : !cir.ptr<!record_ty>
-
-      // Copying without tail padding (for overlapping subobjects):
-      cir.copy %0 to %1 skip_tail_padding : !cir.ptr<!record_ty>
     ```
   }];
 
   let arguments = (ins
       Arg<CIR_PointerType, "", [MemWrite]>:$dst,
       Arg<CIR_PointerType, "", [MemRead]>:$src,
-      UnitAttr:$is_volatile,
-      UnitAttr:$skip_tail_padding
+      UnitAttr:$is_volatile
   );
 
   let assemblyFormat = [{$src `to` $dst (`volatile` $is_volatile^)?
-                        (`skip_tail_padding` $skip_tail_padding^)?
                         attr-dict `:` qualified(type($dst))
   }];
   let hasVerifier = 1;
@@ -4201,15 +4163,10 @@ def CIR_CopyOp : CIR_Op<"copy",[
     /// Returns the pointer type being copied.
     cir::PointerType getType() { return getSrc().getType(); }
 
-    /// Returns the number of bytes to be copied. When skip_tail_padding is
-    /// set, returns the data size (excluding tail padding) of the pointee
-    /// record type. Otherwise returns the full type size.
-    unsigned getCopySizeInBytes(const mlir::DataLayout &dl) {
-      if (getSkipTailPadding())
-        return mlir::cast<cir::RecordType>(getType().getPointee())
-            .computeStructDataSize(dl);
-      return dl.getTypeSize(getType().getPointee());
-    }
+    /// Returns the number of bytes to be copied.
+    unsigned getLength(const mlir::DataLayout &dt) {
+      return dt.getTypeSize(getType().getPointee());
+    }    
   }];
 }
 
@@ -4574,112 +4531,49 @@ def CIR_TrapOp : CIR_Op<"trap", [Terminator]> {
 // ArrayCtor & ArrayDtor
 //===----------------------------------------------------------------------===//
 
-def CIR_ArrayCtor : CIR_Op<"array.ctor", [
-  SingleBlockImplicitTerminator<"cir::YieldOp">
-]> {
+def CIR_ArrayCtor : CIR_Op<"array.ctor"> {
   let summary = "Initialize array elements with C++ constructors";
   let description = [{
     Initialize each array element using the same C++ constructor. This
-    operation has a `body` region and an optional `partial_dtor` region.
-    Both regions have a single block whose argument is a pointer to the
-    current array element.
+    operation has one region, with one single block. The block has an
+    incoming argument for the current array element to initialize.
 
-    The `body` region contains the constructor call for one element.
-
-    The `partial_dtor` region, when non-empty, contains the destructor call
-    for one element. During lowering, it is used to build a cleanup that
-    destroys already-constructed elements if a constructor throws. When the
-    element type has a trivial destructor or exceptions are disabled, the
-    `partial_dtor` region is left empty.
-
-    When `num_elements` is absent, `addr` must be a pointer to a fixed-size
-    CIR array type and the element count is derived from that array type.
-
-    When `num_elements` is present, `addr` is a pointer to the first element
-    and `num_elements` provides the runtime element count (for example `new
-    T[n]`).
-
-    Examples:
+    Example:
 
     ```mlir
-    // Fixed size without partial destructor:
     cir.array.ctor(%0 : !cir.ptr<!cir.array<!rec_S x 42>>) {
       ^bb0(%arg0: !cir.ptr<!rec_S>):
         cir.call @some_ctor(%arg0) : (!cir.ptr<!rec_S>) -> ()
-    }
-
-    // Variable size without partial destructor:
-    cir.array.ctor(%ptr, %n : !cir.ptr<!rec_S>, !u64i) {
-      ^bb0(%arg0: !cir.ptr<!rec_S>):
-        cir.call @some_ctor(%arg0) : (!cir.ptr<!rec_S>) -> ()
-    }
-
-    // Fixed size with partial destructor:
-    cir.array.ctor(%0 : !cir.ptr<!cir.array<!rec_S x 42>>) {
-      ^bb0(%arg0: !cir.ptr<!rec_S>):
-        cir.call @some_ctor(%arg0) : (!cir.ptr<!rec_S>) -> ()
-    } partial_dtor {
-      ^bb0(%arg0: !cir.ptr<!rec_S>):
-        cir.call @some_dtor(%arg0) : (!cir.ptr<!rec_S>) -> ()
+        cir.yield
     }
     ```
   }];
 
   let arguments = (ins
-    Arg<CIR_AnyPtrType, "array or element address", [MemWrite, MemRead]>:$addr,
-    Optional<CIR_AnyIntType>:$num_elements
+    Arg<CIR_PtrToArray, "array address", [MemWrite, MemRead]>:$addr
   );
 
-  let regions = (region SizedRegion<1>:$body, AnyRegion:$partial_dtor);
+  let regions = (region SizedRegion<1>:$body);
   let assemblyFormat = [{
-    $addr (`,` $num_elements^)? `:` qualified(type($addr))
-    (`,` type($num_elements)^)? $body
-    (`partial_dtor` $partial_dtor^)?
-    attr-dict
+    $addr `:` qualified(type($addr)) $body attr-dict
   }];
 
   let builders = [
-    // Static form: addr is ptr<array<T x N>>, no num_elements.
     OpBuilder<(ins "mlir::Value":$addr,
-      "llvm::function_ref<void(mlir::OpBuilder &, mlir::Location)>":$bodyBuilder,
-      "llvm::function_ref<void(mlir::OpBuilder &, mlir::Location)>":$partialDtorBuilder), [{
-        assert(bodyBuilder && "builder callback expected");
+      "llvm::function_ref<void(mlir::OpBuilder &, mlir::Location)>":$regionBuilder), [{
+        assert(regionBuilder && "builder callback expected");
         mlir::OpBuilder::InsertionGuard guard($_builder);
+        mlir::Region *r = $_state.addRegion();
         $_state.addOperands(ValueRange{addr});
-        mlir::Region *body = $_state.addRegion();
-        $_builder.createBlock(body);
-        bodyBuilder($_builder, $_state.location);
-        mlir::Region *partialDtor = $_state.addRegion();
-        if (partialDtorBuilder) {
-          $_builder.createBlock(partialDtor);
-          partialDtorBuilder($_builder, $_state.location);
-        }
-    }]>,
-    // Dynamic form: addr is ptr<T>, num_elements is the runtime count.
-    OpBuilder<(ins "mlir::Value":$addr, "mlir::Value":$num_elements,
-      "llvm::function_ref<void(mlir::OpBuilder &, mlir::Location)>":$bodyBuilder,
-      "llvm::function_ref<void(mlir::OpBuilder &, mlir::Location)>":$partialDtorBuilder), [{
-        assert(bodyBuilder && "builder callback expected");
-        mlir::OpBuilder::InsertionGuard guard($_builder);
-        $_state.addOperands({addr, num_elements});
-        mlir::Region *body = $_state.addRegion();
-        $_builder.createBlock(body);
-        bodyBuilder($_builder, $_state.location);
-        mlir::Region *partialDtor = $_state.addRegion();
-        if (partialDtorBuilder) {
-          $_builder.createBlock(partialDtor);
-          partialDtorBuilder($_builder, $_state.location);
-        }
+        $_builder.createBlock(r);
+        regionBuilder($_builder, $_state.location);
     }]>
   ];
 
-  let hasVerifier = 1;
   let hasLLVMLowering = false;
 }
 
-def CIR_ArrayDtor : CIR_Op<"array.dtor", [
-  SingleBlockImplicitTerminator<"cir::YieldOp">
-]> {
+def CIR_ArrayDtor : CIR_Op<"array.dtor"> {
   let summary = "Destroy array elements with C++ destructors";
   let description = [{
     Destroy each array element using the same C++ destructor. This operation
@@ -4702,12 +4596,14 @@ def CIR_ArrayDtor : CIR_Op<"array.dtor", [
     cir.array.dtor %0 : !cir.ptr<!cir.array<!rec_S x 42>> {
       ^bb0(%arg0: !cir.ptr<!rec_S>):
         cir.call @_ZN1SD1Ev(%arg0) : (!cir.ptr<!rec_S>) -> ()
+        cir.yield
     }
 
     // Dynamic count (delete[] with destructor):
     cir.array.dtor %ptr, %n : !cir.ptr<!rec_S>, !u64i {
       ^bb0(%arg0: !cir.ptr<!rec_S>):
         cir.call @_ZN1SD1Ev(%arg0) : (!cir.ptr<!rec_S>) -> ()
+        cir.yield
     }
     ```
   }];
@@ -4747,7 +4643,6 @@ def CIR_ArrayDtor : CIR_Op<"array.dtor", [
     }]>
   ];
 
-  let hasVerifier = 1;
   let hasLLVMLowering = false;
 }
 
@@ -6429,7 +6324,7 @@ def CIR_TanOp : CIR_UnaryFPToFPBuiltinOp<"tan", "TanOp"> {
   }];
 }
 
-def CIR_TruncOp : CIR_UnaryFPToFPBuiltinOp<"trunc", "FTruncOp"> {
+def CIR_TruncOp : CIR_UnaryFPToFPBuiltinOp<"trunc", "TruncOp"> {
   let summary = "Truncates floating-point value to integer";
   let description = [{
     `cir.trunc` truncates a floating-point operand to an integer value
@@ -6478,7 +6373,7 @@ def CIR_AbsOp : CIR_Op<"abs", [Pure, SameOperandsAndResultType]> {
   let assemblyFormat = "$src ( `min_is_poison` $min_is_poison^ )? `:` type($src) attr-dict";
 }
 
-def CIR_FloorOp : CIR_UnaryFPToFPBuiltinOp<"floor", "FFloorOp"> {
+def CIR_FloorOp : CIR_UnaryFPToFPBuiltinOp<"floor", "FloorOp"> {
   let summary = "Computes the floating-point floor value";
   let description = [{
     `cir.floor` computes the floor of a floating-point operand and returns
@@ -6580,8 +6475,6 @@ def CIR_FMaxNumOp : CIR_BinaryFPToFPBuiltinOp<"fmaxnum", "MaxNumOp"> {
     `cir.fmaxnum` returns the larger of its two operands. If one operand is
     NaN, the other operand is returned.
   }];
-  // Needs custom lowering for FastmathFlags::nsz.
-  let llvmOp = "";
 }
 
 def CIR_FMaximumOp : CIR_BinaryFPToFPBuiltinOp<"fmaximum", "MaximumOp"> {
@@ -6598,8 +6491,6 @@ def CIR_FMinNumOp : CIR_BinaryFPToFPBuiltinOp<"fminnum", "MinNumOp"> {
     `cir.fminnum` returns the smaller of its two operands. If one operand is
     NaN, the other operand is returned.
   }];
-  // Needs custom lowering for FastmathFlags::nsz.
-  let llvmOp = "";
 }
 
 def CIR_FMinimumOp : CIR_BinaryFPToFPBuiltinOp<"fminimum", "MinimumOp"> {
@@ -7011,29 +6902,20 @@ def CIR_EhInflightOp : CIR_Op<"eh.inflight_exception"> {
     This helps CIR to pass down more accurate information for LLVM lowering
     to landingpads.
 
-    The `catch_all` attribute indicates that a catch-all handler exists for
-    the exception being dispatched. When lowered to LLVM IR, this results in
-    a `catch ptr null` clause on the landing pad. When `catch_all` is present
-    alongside typed catches, the landing pad will contain both the typed catch
-    clauses and a trailing `catch ptr null`.
-
     Example:
 
     ```mlir
     %exception_ptr, %type_id = cir.eh.inflight_exception
     %exception_ptr, %type_id = cir.eh.inflight_exception [@_ZTIi, @_ZTIPKc]
     %exception_ptr, %type_id = cir.eh.inflight_exception cleanup
-    %exception_ptr, %type_id = cir.eh.inflight_exception catch_all [@_ZTIi]
     ``
   }];
 
   let arguments = (ins UnitAttr:$cleanup,
-                       UnitAttr:$catch_all,
                        OptionalAttr<FlatSymbolRefArrayAttr>:$catch_type_list);
   let results = (outs CIR_VoidPtrType:$exception_ptr, CIR_UInt32:$type_id);
   let assemblyFormat = [{
     (`cleanup` $cleanup^)?
-    (`catch_all` $catch_all^)?
     ($catch_type_list^)?
     attr-dict
   }];

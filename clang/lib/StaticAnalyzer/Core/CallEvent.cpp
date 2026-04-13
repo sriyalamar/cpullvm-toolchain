@@ -186,7 +186,7 @@ CallEvent::getCalleeStackFrame(unsigned BlockCount) const {
         break;
   assert(Idx < Sz);
 
-  return ADC->getStackFrame(LCtx, E, B, BlockCount, Idx);
+  return ADC->getManager()->getStackFrame(ADC, LCtx, E, B, BlockCount, Idx);
 }
 
 const ParamVarRegion
@@ -1480,7 +1480,7 @@ CallEventManager::getCaller(const StackFrameContext *CalleeCtx,
                                           CalleeCtx->getIndex()};
   assert(CallerCtx && "This should not be used for top-level stack frames");
 
-  const Expr *CallSite = CalleeCtx->getCallSite();
+  const Stmt *CallSite = CalleeCtx->getCallSite();
 
   if (CallSite) {
     if (CallEventRef<> Out = getCall(CallSite, State, CallerCtx, ElemRef))
@@ -1494,11 +1494,13 @@ CallEventManager::getCaller(const StackFrameContext *CalleeCtx,
     if (const auto *CE = dyn_cast<CXXConstructExpr>(CallSite))
       return getCXXConstructorCall(CE, ThisVal.getAsRegion(), State, CallerCtx,
                                    ElemRef);
-    if (const auto *CIE = dyn_cast<CXXInheritedCtorInitExpr>(CallSite))
+    else if (const auto *CIE = dyn_cast<CXXInheritedCtorInitExpr>(CallSite))
       return getCXXInheritedConstructorCall(CIE, ThisVal.getAsRegion(), State,
                                             CallerCtx, ElemRef);
-    // All other cases are handled by getCall.
-    llvm_unreachable("This is not an inlineable statement");
+    else {
+      // All other cases are handled by getCall.
+      llvm_unreachable("This is not an inlineable statement");
+    }
   }
 
   // Fall back to the CFG. The only thing we haven't handled yet is

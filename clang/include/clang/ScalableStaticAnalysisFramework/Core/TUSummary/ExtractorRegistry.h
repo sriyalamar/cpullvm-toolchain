@@ -53,6 +53,9 @@ using TUSummaryExtractorRegistry =
 
 } // namespace clang::ssaf
 
-LLVM_DECLARE_REGISTRY(clang::ssaf::TUSummaryExtractorRegistry)
+namespace llvm {
+extern template class CLANG_TEMPLATE_ABI
+    Registry<clang::ssaf::TUSummaryExtractor, clang::ssaf::TUSummaryBuilder &>;
+} // namespace llvm
 
 #endif // LLVM_CLANG_SCALABLESTATICANALYSISFRAMEWORK_CORE_TUSUMMARY_EXTRACTORREGISTRY_H

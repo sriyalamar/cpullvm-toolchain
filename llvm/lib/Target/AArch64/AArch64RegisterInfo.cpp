@@ -1192,9 +1192,6 @@ bool AArch64RegisterInfo::getRegAllocationHints(
         case AArch64::DestructiveUnaryPassthru:
           AddHintIfSuitable(R, Def.getOperand(3));
           break;
-        case AArch64::DestructiveBinaryShImmUnpred:
-          AddHintIfSuitable(R, Def.getOperand(1));
-          break;
         }
       }
     }

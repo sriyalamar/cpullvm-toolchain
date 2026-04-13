@@ -860,8 +860,8 @@ std::error_code setLastAccessAndModificationTime(int FD, TimePoint<> AccessTime,
 #endif
 }
 
-std::error_code mapped_file_region::init(int FD, uint64_t Offset, mapmode Mode,
-                                         const char *Name) {
+std::error_code mapped_file_region::init(int FD, uint64_t Offset,
+                                         mapmode Mode) {
   assert(Size != 0);
 
   int flags = (Mode == readwrite) ? MAP_SHARED : MAP_PRIVATE;
@@ -896,13 +896,12 @@ std::error_code mapped_file_region::init(int FD, uint64_t Offset, mapmode Mode,
 }
 
 mapped_file_region::mapped_file_region(int fd, mapmode mode, size_t length,
-                                       uint64_t offset, std::error_code &ec,
-                                       const char *name)
+                                       uint64_t offset, std::error_code &ec)
     : Size(length), Mode(mode) {
   sandbox::violationIfEnabled();
 
   (void)Mode;
-  ec = init(fd, offset, mode, name);
+  ec = init(fd, offset, mode);
   if (ec)
     copyFrom(mapped_file_region());
 }

@@ -145,6 +145,11 @@ LLVM_ABI FunctionPass *createSinkingPass();
 LLVM_ABI Pass *createLowerAtomicPass();
 
 //===----------------------------------------------------------------------===//
+//
+// MergeICmps - Merge integer comparison chains into a memcmp
+//
+LLVM_ABI Pass *createMergeICmpsLegacyPass();
+
 //===----------------------------------------------------------------------===//
 //
 // InferAddressSpaces - Modify users of addrspacecast instructions with values

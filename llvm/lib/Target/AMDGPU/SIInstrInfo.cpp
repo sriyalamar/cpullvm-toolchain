@@ -2162,9 +2162,11 @@ bool SIInstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
       Register DstLo = RI.getSubReg(Dst, AMDGPU::sub0);
       Register DstHi = RI.getSubReg(Dst, AMDGPU::sub1);
       BuildMI(MBB, MI, DL, get(AMDGPU::V_ACCVGPR_WRITE_B32_e64), DstLo)
-          .addImm(SignExtend64<32>(Imm));
+          .addImm(SignExtend64<32>(Imm))
+          .addReg(Dst, RegState::Implicit | RegState::Define);
       BuildMI(MBB, MI, DL, get(AMDGPU::V_ACCVGPR_WRITE_B32_e64), DstHi)
-          .addImm(SignExtend64<32>(Imm >> 32));
+          .addImm(SignExtend64<32>(Imm >> 32))
+          .addReg(Dst, RegState::Implicit | RegState::Define);
       MI.eraseFromParent();
       break;
     }
@@ -2209,9 +2211,11 @@ bool SIInstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
             .addImm(0); // clamp
       } else {
         BuildMI(MBB, MI, DL, get(AMDGPU::V_MOV_B32_e32), DstLo)
-            .addImm(Lo.getSExtValue());
+          .addImm(Lo.getSExtValue())
+          .addReg(Dst, RegState::Implicit | RegState::Define);
         BuildMI(MBB, MI, DL, get(AMDGPU::V_MOV_B32_e32), DstHi)
-            .addImm(Hi.getSExtValue());
+          .addImm(Hi.getSExtValue())
+          .addReg(Dst, RegState::Implicit | RegState::Define);
       }
     } else {
       assert(SrcOp.isReg());
@@ -2229,9 +2233,11 @@ bool SIInstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
           .addImm(0); // clamp
       } else {
         BuildMI(MBB, MI, DL, get(AMDGPU::V_MOV_B32_e32), DstLo)
-            .addReg(RI.getSubReg(SrcOp.getReg(), AMDGPU::sub0));
+          .addReg(RI.getSubReg(SrcOp.getReg(), AMDGPU::sub0))
+          .addReg(Dst, RegState::Implicit | RegState::Define);
         BuildMI(MBB, MI, DL, get(AMDGPU::V_MOV_B32_e32), DstHi)
-            .addReg(RI.getSubReg(SrcOp.getReg(), AMDGPU::sub1));
+          .addReg(RI.getSubReg(SrcOp.getReg(), AMDGPU::sub1))
+          .addReg(Dst, RegState::Implicit | RegState::Define);
       }
     }
     MI.eraseFromParent();
@@ -2263,9 +2269,11 @@ bool SIInstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
     APInt Lo(32, Imm.getLoBits(32).getZExtValue());
     APInt Hi(32, Imm.getHiBits(32).getZExtValue());
     BuildMI(MBB, MI, DL, get(AMDGPU::S_MOV_B32), DstLo)
-        .addImm(Lo.getSExtValue());
+      .addImm(Lo.getSExtValue())
+      .addReg(Dst, RegState::Implicit | RegState::Define);
     BuildMI(MBB, MI, DL, get(AMDGPU::S_MOV_B32), DstHi)
-        .addImm(Hi.getSExtValue());
+      .addImm(Hi.getSExtValue())
+      .addReg(Dst, RegState::Implicit | RegState::Define);
     MI.eraseFromParent();
     break;
   }
@@ -10717,8 +10725,8 @@ SIInstrInfo::getCalleeOperand(const MachineInstr &MI) const {
   return TargetInstrInfo::getCalleeOperand(MI);
 }
 
-ValueUniformity
-SIInstrInfo::getGenericValueUniformity(const MachineInstr &MI) const {
+InstructionUniformity
+SIInstrInfo::getGenericInstructionUniformity(const MachineInstr &MI) const {
   const MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
   unsigned Opcode = MI.getOpcode();
 
@@ -10733,8 +10741,8 @@ SIInstrInfo::getGenericValueUniformity(const MachineInstr &MI) const {
     return SrcAS == AMDGPUAS::PRIVATE_ADDRESS &&
                    DstAS == AMDGPUAS::FLAT_ADDRESS &&
                    ST.hasGloballyAddressableScratch()
-               ? ValueUniformity::NeverUniform
-               : ValueUniformity::Default;
+               ? InstructionUniformity::NeverUniform
+               : InstructionUniformity::Default;
   };
 
   // If the target supports globally addressable scratch, the mapping from
@@ -10746,9 +10754,9 @@ SIInstrInfo::getGenericValueUniformity(const MachineInstr &MI) const {
   if (auto *GI = dyn_cast<GIntrinsic>(&MI)) {
     auto IID = GI->getIntrinsicID();
     if (AMDGPU::isIntrinsicSourceOfDivergence(IID))
-      return ValueUniformity::NeverUniform;
+      return InstructionUniformity::NeverUniform;
     if (AMDGPU::isIntrinsicAlwaysUniform(IID))
-      return ValueUniformity::AlwaysUniform;
+      return InstructionUniformity::AlwaysUniform;
 
     switch (IID) {
     case Intrinsic::amdgcn_addrspacecast_nonnull:
@@ -10759,7 +10767,7 @@ SIInstrInfo::getGenericValueUniformity(const MachineInstr &MI) const {
       break;
     }
 
-    return ValueUniformity::Default;
+    return InstructionUniformity::Default;
   }
 
   // Loads from the private and flat address spaces are divergent, because
@@ -10771,25 +10779,25 @@ SIInstrInfo::getGenericValueUniformity(const MachineInstr &MI) const {
   if (Opcode == AMDGPU::G_LOAD || Opcode == AMDGPU::G_ZEXTLOAD ||
       Opcode == AMDGPU::G_SEXTLOAD) {
     if (MI.memoperands_empty())
-      return ValueUniformity::NeverUniform; // conservative assumption
+      return InstructionUniformity::NeverUniform; // conservative assumption
 
     if (llvm::any_of(MI.memoperands(), [](const MachineMemOperand *mmo) {
           return mmo->getAddrSpace() == AMDGPUAS::PRIVATE_ADDRESS ||
                  mmo->getAddrSpace() == AMDGPUAS::FLAT_ADDRESS;
         })) {
       // At least one MMO in a non-global address space.
-      return ValueUniformity::NeverUniform;
+      return InstructionUniformity::NeverUniform;
     }
-    return ValueUniformity::Default;
+    return InstructionUniformity::Default;
   }
 
   if (SIInstrInfo::isGenericAtomicRMWOpcode(Opcode) ||
       Opcode == AMDGPU::G_ATOMIC_CMPXCHG ||
       Opcode == AMDGPU::G_ATOMIC_CMPXCHG_WITH_SUCCESS ||
       AMDGPU::isGenericAtomic(Opcode)) {
-    return ValueUniformity::NeverUniform;
+    return InstructionUniformity::NeverUniform;
   }
-  return ValueUniformity::Default;
+  return InstructionUniformity::Default;
 }
 
 const MIRFormatter *SIInstrInfo::getMIRFormatter() const {
@@ -10798,31 +10806,32 @@ const MIRFormatter *SIInstrInfo::getMIRFormatter() const {
   return Formatter.get();
 }
 
-ValueUniformity SIInstrInfo::getValueUniformity(const MachineInstr &MI) const {
+InstructionUniformity
+SIInstrInfo::getInstructionUniformity(const MachineInstr &MI) const {
 
   if (isNeverUniform(MI))
-    return ValueUniformity::NeverUniform;
+    return InstructionUniformity::NeverUniform;
 
   unsigned opcode = MI.getOpcode();
   if (opcode == AMDGPU::V_READLANE_B32 ||
       opcode == AMDGPU::V_READFIRSTLANE_B32 ||
       opcode == AMDGPU::SI_RESTORE_S32_FROM_VGPR)
-    return ValueUniformity::AlwaysUniform;
+    return InstructionUniformity::AlwaysUniform;
 
   if (isCopyInstr(MI)) {
     const MachineOperand &srcOp = MI.getOperand(1);
     if (srcOp.isReg() && srcOp.getReg().isPhysical()) {
       const TargetRegisterClass *regClass =
           RI.getPhysRegBaseClass(srcOp.getReg());
-      return RI.isSGPRClass(regClass) ? ValueUniformity::AlwaysUniform
-                                      : ValueUniformity::NeverUniform;
+      return RI.isSGPRClass(regClass) ? InstructionUniformity::AlwaysUniform
+                                      : InstructionUniformity::NeverUniform;
     }
-    return ValueUniformity::Default;
+    return InstructionUniformity::Default;
   }
 
   // GMIR handling
   if (MI.isPreISelOpcode())
-    return SIInstrInfo::getGenericValueUniformity(MI);
+    return SIInstrInfo::getGenericInstructionUniformity(MI);
 
   // Atomics are divergent because they are executed sequentially: when an
   // atomic operation refers to the same address in each thread, then each
@@ -10830,24 +10839,24 @@ ValueUniformity SIInstrInfo::getValueUniformity(const MachineInstr &MI) const {
   // original value.
 
   if (isAtomic(MI))
-    return ValueUniformity::NeverUniform;
+    return InstructionUniformity::NeverUniform;
 
   // Loads from the private and flat address spaces are divergent, because
   // threads can execute the load instruction with the same inputs and get
   // different results.
   if (isFLAT(MI) && MI.mayLoad()) {
     if (MI.memoperands_empty())
-      return ValueUniformity::NeverUniform; // conservative assumption
+      return InstructionUniformity::NeverUniform; // conservative assumption
 
     if (llvm::any_of(MI.memoperands(), [](const MachineMemOperand *mmo) {
           return mmo->getAddrSpace() == AMDGPUAS::PRIVATE_ADDRESS ||
                  mmo->getAddrSpace() == AMDGPUAS::FLAT_ADDRESS;
         })) {
       // At least one MMO in a non-global address space.
-      return ValueUniformity::NeverUniform;
+      return InstructionUniformity::NeverUniform;
     }
 
-    return ValueUniformity::Default;
+    return InstructionUniformity::Default;
   }
 
   const MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
@@ -10869,7 +10878,7 @@ ValueUniformity SIInstrInfo::getValueUniformity(const MachineInstr &MI) const {
     // register, which are all scalars.
     const RegisterBank *RegBank = RBI->getRegBank(Reg, MRI, RI);
     if (RegBank && RegBank->getID() != AMDGPU::SGPRRegBankID)
-      return ValueUniformity::NeverUniform;
+      return InstructionUniformity::NeverUniform;
   }
 
   // TODO: Uniformity check condtions above can be rearranged for more
@@ -10879,7 +10888,7 @@ ValueUniformity SIInstrInfo::getValueUniformity(const MachineInstr &MI) const {
   //       currently turned into no-op COPYs by SelectionDAG ISel and are
   //       therefore no longer recognizable.
 
-  return ValueUniformity::Default;
+  return InstructionUniformity::Default;
 }
 
 unsigned SIInstrInfo::getDSShaderTypeValue(const MachineFunction &MF) {

@@ -482,8 +482,9 @@ protected:
 
     if (m_interpreter.AliasExists(alias_command) ||
         m_interpreter.UserCommandExists(alias_command)) {
-      result.AppendWarningWithFormatv(
-          "Overwriting existing definition for '{0}'.", alias_command);
+      result.AppendWarningWithFormat(
+          "Overwriting existing definition for '%s'.\n",
+          alias_command.str().c_str());
     }
     if (CommandAlias *alias = m_interpreter.AddAlias(
             alias_command, cmd_obj_sp, raw_command_string)) {
@@ -578,8 +579,8 @@ protected:
 
     if (m_interpreter.AliasExists(alias_command) ||
         m_interpreter.UserCommandExists(alias_command)) {
-      result.AppendWarningWithFormatv(
-          "Overwriting existing definition for '{0}'.", alias_command);
+      result.AppendWarningWithFormat(
+          "Overwriting existing definition for '%s'.\n", alias_command.c_str());
     }
 
     if (CommandAlias *alias = m_interpreter.AddAlias(

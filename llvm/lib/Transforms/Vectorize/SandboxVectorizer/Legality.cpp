@@ -219,10 +219,13 @@ const LegalityResult &LegalityAnalysis::canVectorize(ArrayRef<Value *> Bndl,
   if (any_of(Bndl, [](auto *V) { return !isa<Instruction>(V); }))
     return createLegalityResult<Pack>(ResultReason::NotInstructions);
   // Pack if not in the same BB.
-  if (LegalityAnalysis::differentBlock(Bndl))
+  auto *BB = cast<Instruction>(Bndl[0])->getParent();
+  if (any_of(drop_begin(Bndl),
+             [BB](auto *V) { return cast<Instruction>(V)->getParent() != BB; }))
     return createLegalityResult<Pack>(ResultReason::DiffBBs);
   // Pack if instructions repeat, i.e., require some sort of broadcast.
-  if (!LegalityAnalysis::areUnique(Bndl))
+  SmallPtrSet<Value *, 8> Unique(llvm::from_range, Bndl);
+  if (Unique.size() != Bndl.size())
     return createLegalityResult<Pack>(ResultReason::RepeatedInstrs);
 
   auto CollectDescrs = getHowToCollectValues(Bndl);

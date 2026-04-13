@@ -2404,7 +2404,7 @@ WebAssemblyTargetLowering::LowerEXTEND_VECTOR_INREG(SDValue Op,
 
 static SDValue LowerConvertLow(SDValue Op, SelectionDAG &DAG) {
   SDLoc DL(Op);
-  if (Op.getValueType() != MVT::v2f64 && Op.getValueType() != MVT::v4f32)
+  if (Op.getValueType() != MVT::v2f64)
     return SDValue();
 
   auto GetConvertedLane = [](SDValue Op, unsigned &Opcode, SDValue &SrcVec,
@@ -2417,7 +2417,6 @@ static SDValue LowerConvertLow(SDValue Op, SelectionDAG &DAG) {
       Opcode = WebAssemblyISD::CONVERT_LOW_U;
       break;
     case ISD::FP_EXTEND:
-    case ISD::FP16_TO_FP:
       Opcode = WebAssemblyISD::PROMOTE_LOW;
       break;
     default:
@@ -2436,60 +2435,36 @@ static SDValue LowerConvertLow(SDValue Op, SelectionDAG &DAG) {
     return true;
   };
 
-  unsigned NumLanes = Op.getValueType() == MVT::v2f64 ? 2 : 4;
-  unsigned FirstOpcode = 0, SecondOpcode = 0, ThirdOpcode = 0, FourthOpcode = 0;
-  unsigned FirstIndex = 0, SecondIndex = 0, ThirdIndex = 0, FourthIndex = 0;
-  SDValue FirstSrcVec, SecondSrcVec, ThirdSrcVec, FourthSrcVec;
-
-  if (!GetConvertedLane(Op.getOperand(0), FirstOpcode, FirstSrcVec,
-                        FirstIndex) ||
-      !GetConvertedLane(Op.getOperand(1), SecondOpcode, SecondSrcVec,
-                        SecondIndex))
+  unsigned LHSOpcode, RHSOpcode, LHSIndex, RHSIndex;
+  SDValue LHSSrcVec, RHSSrcVec;
+  if (!GetConvertedLane(Op.getOperand(0), LHSOpcode, LHSSrcVec, LHSIndex) ||
+      !GetConvertedLane(Op.getOperand(1), RHSOpcode, RHSSrcVec, RHSIndex))
     return SDValue();
 
-  // If we're converting to v4f32, check the third and fourth lanes, too.
-  if (NumLanes == 4 && (!GetConvertedLane(Op.getOperand(2), ThirdOpcode,
-                                          ThirdSrcVec, ThirdIndex) ||
-                        !GetConvertedLane(Op.getOperand(3), FourthOpcode,
-                                          FourthSrcVec, FourthIndex)))
-    return SDValue();
-
-  if (FirstOpcode != SecondOpcode)
-    return SDValue();
-
-  // TODO Add an optimization similar to the v2f64 below for shuffling the
-  // vectors when the lanes are in the wrong order or come from different src
-  // vectors.
-  if (NumLanes == 4 &&
-      (FirstOpcode != ThirdOpcode || FirstOpcode != FourthOpcode ||
-       FirstSrcVec != SecondSrcVec || FirstSrcVec != ThirdSrcVec ||
-       FirstSrcVec != FourthSrcVec || FirstIndex != 0 || SecondIndex != 1 ||
-       ThirdIndex != 2 || FourthIndex != 3))
+  if (LHSOpcode != RHSOpcode)
     return SDValue();
 
   MVT ExpectedSrcVT;
-  switch (FirstOpcode) {
+  switch (LHSOpcode) {
   case WebAssemblyISD::CONVERT_LOW_S:
   case WebAssemblyISD::CONVERT_LOW_U:
     ExpectedSrcVT = MVT::v4i32;
     break;
   case WebAssemblyISD::PROMOTE_LOW:
-    ExpectedSrcVT = NumLanes == 2 ? MVT::v4f32 : MVT::v8i16;
+    ExpectedSrcVT = MVT::v4f32;
     break;
   }
-  if (FirstSrcVec.getValueType() != ExpectedSrcVT)
+  if (LHSSrcVec.getValueType() != ExpectedSrcVT)
     return SDValue();
 
-  auto Src = FirstSrcVec;
-  if (NumLanes == 2 &&
-      (FirstIndex != 0 || SecondIndex != 1 || FirstSrcVec != SecondSrcVec)) {
+  auto Src = LHSSrcVec;
+  if (LHSIndex != 0 || RHSIndex != 1 || LHSSrcVec != RHSSrcVec) {
     // Shuffle the source vector so that the converted lanes are the low lanes.
-    Src = DAG.getVectorShuffle(ExpectedSrcVT, DL, FirstSrcVec, SecondSrcVec,
-                               {static_cast<int>(FirstIndex),
-                                static_cast<int>(SecondIndex) + 4, -1, -1});
+    Src = DAG.getVectorShuffle(
+        ExpectedSrcVT, DL, LHSSrcVec, RHSSrcVec,
+        {static_cast<int>(LHSIndex), static_cast<int>(RHSIndex) + 4, -1, -1});
   }
-  return DAG.getNode(FirstOpcode, DL, NumLanes == 2 ? MVT::v2f64 : MVT::v4f32,
-                     Src);
+  return DAG.getNode(LHSOpcode, DL, MVT::v2f64, Src);
 }
 
 SDValue WebAssemblyTargetLowering::LowerBUILD_VECTOR(SDValue Op,
@@ -3385,7 +3360,7 @@ static SDValue performBitcastCombine(SDNode *N,
     for (SDValue V : VectorsToShuffle) {
       ReturningInteger = DAG.getNode(
           ISD::SHL, DL, ReturnType,
-          {ReturningInteger, DAG.getShiftAmountConstant(16, ReturnType, DL)});
+          {DAG.getShiftAmountConstant(16, ReturnType, DL), ReturningInteger});
 
       SDValue ExtendedV = DAG.getZExtOrTrunc(V, DL, ReturnType);
       ReturningInteger =

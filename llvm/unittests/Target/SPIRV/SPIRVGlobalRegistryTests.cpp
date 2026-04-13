@@ -65,7 +65,7 @@ protected:
 };
 
 TEST_F(SPIRVGlobalRegistryTest, IsAggregateType) {
-  SPIRVGlobalRegistry GR(MF->getDataLayout());
+  SPIRVGlobalRegistry GR(8);
   EXPECT_TRUE(GR.isAggregateType(makeTypeInstr(SPIRV::OpTypeStruct)));
   EXPECT_TRUE(GR.isAggregateType(makeTypeInstr(SPIRV::OpTypeArray)));
   EXPECT_FALSE(GR.isAggregateType(makeTypeInstr(SPIRV::OpTypeFloat)));

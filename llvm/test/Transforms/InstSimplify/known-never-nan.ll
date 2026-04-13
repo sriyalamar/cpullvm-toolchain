@@ -340,7 +340,10 @@ define i1 @uitofp_add(i32 %arg0) {
 
 define i1 @uitofp_add_big(i1024 %arg0) {
 ; CHECK-LABEL: @uitofp_add_big(
-; CHECK-NEXT:    ret i1 true
+; CHECK-NEXT:    [[OP:%.*]] = uitofp i1024 [[ARG0:%.*]] to double
+; CHECK-NEXT:    [[ADD:%.*]] = fadd double [[OP]], [[OP]]
+; CHECK-NEXT:    [[TMP:%.*]] = fcmp ord double [[ADD]], [[ADD]]
+; CHECK-NEXT:    ret i1 [[TMP]]
 ;
   %op = uitofp i1024 %arg0 to double
   %add = fadd double %op, %op

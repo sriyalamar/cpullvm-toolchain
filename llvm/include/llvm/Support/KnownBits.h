@@ -38,7 +38,7 @@ public:
   KnownBits() = default;
 
   /// Create a known bits object of BitWidth bits initialized to unknown.
-  explicit KnownBits(unsigned BitWidth) : Zero(BitWidth, 0), One(BitWidth, 0) {}
+  KnownBits(unsigned BitWidth) : Zero(BitWidth, 0), One(BitWidth, 0) {}
 
   /// Get the bit width of this value.
   unsigned getBitWidth() const {

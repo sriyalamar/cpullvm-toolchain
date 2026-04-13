@@ -12890,7 +12890,7 @@ bool Sema::CheckForConstantInitializer(Expr *Init, unsigned DiagID) {
     return true;
   }
   const Expr *Culprit;
-  if (Init->isConstantInitializer(Context, /*ForRef=*/false, &Culprit))
+  if (Init->isConstantInitializer(Context, false, &Culprit))
     return false;
 
   // Emit ObjC-specific diagnostics for non-constant literals at file scope.
@@ -12900,7 +12900,7 @@ bool Sema::CheckForConstantInitializer(Expr *Init, unsigned DiagID) {
     // the offender.
     if (auto ALE = dyn_cast<ObjCArrayLiteral>(Init)) {
       for (auto *Elm : ALE->elements()) {
-        if (!Elm->isConstantInitializer(Context)) {
+        if (!Elm->isConstantInitializer(Context, false, nullptr)) {
           Diag(Elm->getExprLoc(),
                diag::err_objc_literal_nonconstant_at_file_scope)
               << ObjC().CheckLiteralKind(Init) << Elm->getSourceRange();
@@ -12915,14 +12915,14 @@ bool Sema::CheckForConstantInitializer(Expr *Init, unsigned DiagID) {
 
         // Check that the key is a string literal and is constant.
         if (!isa<ObjCStringLiteral>(Elm.Key) ||
-            !Elm.Key->isConstantInitializer(Context)) {
+            !Elm.Key->isConstantInitializer(Context, false, nullptr)) {
           Diag(Elm.Key->getExprLoc(),
                diag::err_objc_literal_nonconstant_at_file_scope)
               << ObjC().CheckLiteralKind(Init) << Elm.Key->getSourceRange();
           return true;
         }
 
-        if (!Elm.Value->isConstantInitializer(Context)) {
+        if (!Elm.Value->isConstantInitializer(Context, false, nullptr)) {
           Diag(Elm.Value->getExprLoc(),
                diag::err_objc_literal_nonconstant_at_file_scope)
               << ObjC().CheckLiteralKind(Init) << Elm.Value->getSourceRange();
@@ -18047,8 +18047,7 @@ Sema::ActOnTag(Scope *S, unsigned TagSpec, TagUseKind TUK, SourceLocation KWLoc,
   bool IsFixed = !UnderlyingType.isUnset() || ScopedEnum;
 
   if (Kind == TagTypeKind::Enum) {
-    if (UnderlyingType.isInvalid() || (!UnderlyingType.get() && ScopedEnum) ||
-        Invalid) {
+    if (UnderlyingType.isInvalid() || (!UnderlyingType.get() && ScopedEnum)) {
       // No underlying type explicitly specified, or we failed to parse the
       // type, default to int.
       EnumUnderlying = Context.IntTy.getTypePtr();

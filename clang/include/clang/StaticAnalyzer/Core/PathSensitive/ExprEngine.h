@@ -89,6 +89,7 @@ class ProgramState;
 class ProgramStateManager;
 class RegionAndSymbolInvalidationTraits;
 class SymbolManager;
+class SwitchNodeBuilder;
 
 /// Hints for figuring out of a call should be inlined during evalCall().
 struct EvalCallOptions {

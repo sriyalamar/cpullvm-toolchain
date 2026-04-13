@@ -98,8 +98,7 @@ void CallGraphExtractor::handleCallGraphNode(const ASTContext &Ctx,
 }
 
 static TUSummaryExtractorRegistry::Add<CallGraphExtractor>
-    RegisterExtractor(CallGraphSummary::Name,
-                      "Extracts static call-graph information");
+    RegisterExtractor("CallGraph", "Extracts static call-graph information");
 
 // This anchor is used to force the linker to link in the generated object file
 // and thus register the CallGraphExtractor.

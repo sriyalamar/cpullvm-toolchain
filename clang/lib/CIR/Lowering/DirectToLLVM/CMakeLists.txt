@@ -10,7 +10,6 @@ add_clang_library(clangCIRLoweringDirectToLLVM
   LowerToLLVMIR.cpp
 
   DEPENDS
-  CIRLowering
   MLIRCIREnumsGen
   MLIRCIROpsIncGen
   MLIRCIROpInterfacesIncGen
@@ -23,7 +22,6 @@ add_clang_library(clangCIRLoweringDirectToLLVM
   MLIRBuiltinToLLVMIRTranslation
   MLIRLLVMToLLVMIRTranslation
   MLIROpenMPToLLVMIRTranslation
-  MLIROpenMPTransforms
   MLIRIR
   )
 

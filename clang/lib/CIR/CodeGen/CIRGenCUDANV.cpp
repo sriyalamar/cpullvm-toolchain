@@ -150,14 +150,10 @@ void CIRGenNVCUDARuntime::emitDeviceStubBodyNew(CIRGenFunction &cgf,
 
   // The default stream is usually stream 0 (the legacy default stream).
   // For per-thread default stream, we need a different LaunchKernel function.
-  std::string kernelLaunchAPI = "LaunchKernel";
+  StringRef kernelLaunchAPI = "LaunchKernel";
   if (cgm.getLangOpts().GPUDefaultStream ==
-      LangOptions::GPUDefaultStreamKind::PerThread) {
-    if (cgm.getLangOpts().HIP)
-      kernelLaunchAPI += "_spt";
-    else if (cgm.getLangOpts().CUDA)
-      kernelLaunchAPI += "_ptsz";
-  }
+      LangOptions::GPUDefaultStreamKind::PerThread)
+    cgm.errorNYI("CUDA/HIP Stream per thread");
 
   std::string launchKernelName = addPrefixToName(kernelLaunchAPI);
   const IdentifierInfo &launchII =

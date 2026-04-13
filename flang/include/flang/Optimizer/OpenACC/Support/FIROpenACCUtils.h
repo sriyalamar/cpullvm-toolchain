@@ -15,7 +15,6 @@
 
 #include "mlir/Dialect/OpenACC/OpenACC.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include <string>
 

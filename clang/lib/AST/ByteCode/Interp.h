@@ -36,12 +36,12 @@
 #include "llvm/ADT/ScopeExit.h"
 #include <type_traits>
 
-// preserve_none causes problems when asan is enabled on both AArch64 and other
-// platforms. Disable it until all the bugs are fixed here.
-//
-// See https://github.com/llvm/llvm-project/issues/177519 for AArch64.
+// preserve_none is supported on aarch64, but causes problems when asan is
+// enabled. See https://github.com/llvm/llvm-project/issues/177519.
+// preserve_none also causes problems on clang <= 19 if asan is enabled.
 #if !defined(__aarch64__) && !defined(__i386__) &&                             \
-    !__has_feature(address_sanitizer) &&                                       \
+    !(defined(__clang_major__) && __clang_major__ <= 19 &&                     \
+      __has_feature(address_sanitizer)) &&                                     \
     __has_cpp_attribute(clang::preserve_none)
 #define PRESERVE_NONE [[clang::preserve_none]]
 #else
@@ -133,7 +133,6 @@ bool CheckDestructor(InterpState &S, CodePtr OpPC, const Pointer &Ptr);
 bool CheckFunctionDecl(InterpState &S, CodePtr OpPC, const FunctionDecl *FD);
 bool CheckBitCast(InterpState &S, CodePtr OpPC, const Type *TargetType,
                   bool SrcIsVoidPtr);
-bool handleReference(InterpState &S, CodePtr OpPC, Block *B);
 bool InvalidCast(InterpState &S, CodePtr OpPC, CastKind Kind, bool Fatal);
 
 bool handleFixedPointOverflow(InterpState &S, CodePtr OpPC,
@@ -141,7 +140,6 @@ bool handleFixedPointOverflow(InterpState &S, CodePtr OpPC,
 
 bool Destroy(InterpState &S, CodePtr OpPC, uint32_t I);
 bool isConstexprUnknown(const Pointer &P);
-bool isConstexprUnknown(const Block *B);
 
 enum class ShiftDir { Left, Right };
 
@@ -1639,9 +1637,6 @@ bool InitThisField(InterpState &S, CodePtr OpPC, uint32_t I) {
   if (!CheckThis(S, OpPC))
     return false;
   const Pointer &This = S.Current->getThis();
-  if (!This.isDereferencable())
-    return false;
-
   const Pointer &Field = This.atField(I);
   assert(Field.canBeInitialized());
   Field.deref<T>() = S.Stk.pop<T>();
@@ -1656,9 +1651,6 @@ bool InitThisFieldActivate(InterpState &S, CodePtr OpPC, uint32_t I) {
   if (!CheckThis(S, OpPC))
     return false;
   const Pointer &This = S.Current->getThis();
-  if (!This.isDereferencable())
-    return false;
-
   const Pointer &Field = This.atField(I);
   assert(Field.canBeInitialized());
   Field.deref<T>() = S.Stk.pop<T>();
@@ -1678,9 +1670,6 @@ bool InitThisBitField(InterpState &S, CodePtr OpPC,
   if (!CheckThis(S, OpPC))
     return false;
   const Pointer &This = S.Current->getThis();
-  if (!This.isDereferencable())
-    return false;
-
   const Pointer &Field = This.atField(FieldOffset);
   assert(Field.canBeInitialized());
   const auto &Value = S.Stk.pop<T>();
@@ -1697,9 +1686,6 @@ bool InitThisBitFieldActivate(InterpState &S, CodePtr OpPC,
   if (!CheckThis(S, OpPC))
     return false;
   const Pointer &This = S.Current->getThis();
-  if (!This.isDereferencable())
-    return false;
-
   const Pointer &Field = This.atField(FieldOffset);
   assert(Field.canBeInitialized());
   const auto &Value = S.Stk.pop<T>();
@@ -1716,9 +1702,6 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitField(InterpState &S, CodePtr OpPC, uint32_t I) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
-  if (!Ptr.isDereferencable())
-    return false;
-
   if (!CheckRange(S, OpPC, Ptr, CSK_Field))
     return false;
   if (!CheckArray(S, OpPC, Ptr))
@@ -1734,9 +1717,6 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitFieldActivate(InterpState &S, CodePtr OpPC, uint32_t I) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
-  if (!Ptr.isDereferencable())
-    return false;
-
   if (!CheckRange(S, OpPC, Ptr, CSK_Field))
     return false;
   if (!CheckArray(S, OpPC, Ptr))
@@ -1754,9 +1734,6 @@ bool InitBitField(InterpState &S, CodePtr OpPC, uint32_t FieldOffset,
                   uint32_t FieldBitWidth) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
-  if (!Ptr.isDereferencable())
-    return false;
-
   if (!CheckRange(S, OpPC, Ptr, CSK_Field))
     return false;
   if (!CheckArray(S, OpPC, Ptr))
@@ -1787,9 +1764,6 @@ bool InitBitFieldActivate(InterpState &S, CodePtr OpPC, uint32_t FieldOffset,
                           uint32_t FieldBitWidth) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
-  if (!Ptr.isDereferencable())
-    return false;
-
   if (!CheckRange(S, OpPC, Ptr, CSK_Field))
     return false;
   if (!CheckArray(S, OpPC, Ptr))
@@ -1823,11 +1797,6 @@ bool InitBitFieldActivate(InterpState &S, CodePtr OpPC, uint32_t FieldOffset,
 inline bool GetPtrLocal(InterpState &S, CodePtr OpPC, uint32_t I) {
   S.Stk.push<Pointer>(S.Current->getLocalPointer(I));
   return true;
-}
-
-inline bool GetRefLocal(InterpState &S, CodePtr OpPC, uint32_t I) {
-  Block *LocalBlock = S.Current->getLocalBlock(I);
-  return handleReference(S, OpPC, LocalBlock);
 }
 
 inline bool GetPtrParam(InterpState &S, CodePtr OpPC, uint32_t Index) {
@@ -1903,9 +1872,6 @@ inline bool GetPtrBase(InterpState &S, CodePtr OpPC, uint32_t Off) {
     return true;
   }
 
-  if (isConstexprUnknown(Ptr))
-    return false;
-
   if (!CheckSubobject(S, OpPC, Ptr, CSK_Base))
     return false;
   const Pointer &Result = Ptr.atField(Off);
@@ -1928,9 +1894,6 @@ inline bool GetPtrBasePop(InterpState &S, CodePtr OpPC, uint32_t Off,
     S.Stk.push<Pointer>(Ptr.asIntPointer().baseCast(S.getASTContext(), Off));
     return true;
   }
-
-  if (isConstexprUnknown(Ptr))
-    return false;
 
   if (!CheckSubobject(S, OpPC, Ptr, CSK_Base))
     return false;
@@ -2228,9 +2191,6 @@ bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.peek<Pointer>();
 
-  if (Ptr.isConstexprUnknown())
-    return false;
-
   const Descriptor *Desc = Ptr.getFieldDesc();
   if (Desc->isUnknownSizeArray())
     return false;
@@ -2264,9 +2224,6 @@ template <PrimType Name, class T = typename PrimConv<Name>::T>
 bool InitElemPop(InterpState &S, CodePtr OpPC, uint32_t Idx) {
   const T &Value = S.Stk.pop<T>();
   const Pointer &Ptr = S.Stk.pop<Pointer>();
-
-  if (Ptr.isConstexprUnknown())
-    return false;
 
   const Descriptor *Desc = Ptr.getFieldDesc();
   if (Desc->isUnknownSizeArray())
@@ -2912,8 +2869,7 @@ inline bool This(InterpState &S, CodePtr OpPC) {
       [[maybe_unused]] const Record *R = This.getRecord();
       if (!R)
         R = This.narrow().getRecord();
-      if (!R)
-        return false;
+      assert(R);
       assert(R->getDecl() ==
              cast<CXXMethodDecl>(S.Current->getFunction()->getDecl())
                  ->getParent());

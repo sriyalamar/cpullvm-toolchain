@@ -155,7 +155,7 @@ void RISCVAsmPrinter::LowerSTACKMAP(MCStreamer &OutStreamer, StackMaps &SM,
         MII->getOpcode() == TargetOpcode::STACKMAP)
       break;
     ++MII;
-    NumNOPBytes -= NOPBytes;
+    NumNOPBytes -= 4;
   }
 
   // Emit nops.

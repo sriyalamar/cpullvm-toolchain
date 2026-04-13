@@ -10,7 +10,6 @@
 
 #include "lldb/DataFormatters/FormattersHelpers.h"
 #include "lldb/DataFormatters/TypeSynthetic.h"
-#include "llvm/Support/ErrorExtras.h"
 
 using namespace lldb;
 
@@ -56,7 +55,7 @@ lldb_private::formatters::MsvcStlDequeSyntheticFrontEnd::
 llvm::Expected<uint32_t> lldb_private::formatters::
     MsvcStlDequeSyntheticFrontEnd::CalculateNumChildren() {
   if (!m_map)
-    return llvm::createStringError("failed to read size");
+    return llvm::createStringError("Failed to read size");
   return m_size;
 }
 
@@ -159,11 +158,13 @@ lldb_private::formatters::MsvcStlDequeSyntheticFrontEnd::Update() {
 llvm::Expected<size_t> lldb_private::formatters::MsvcStlDequeSyntheticFrontEnd::
     GetIndexOfChildWithName(ConstString name) {
   if (!m_map)
-    return llvm::createStringErrorV("type has no child named '{0}'", name);
+    return llvm::createStringError("Type has no child named '%s'",
+                                   name.AsCString());
   if (auto optional_idx = ExtractIndexFromString(name.GetCString()))
     return *optional_idx;
 
-  return llvm::createStringErrorV("type has no child named '{0}'", name);
+  return llvm::createStringError("Type has no child named '%s'",
+                                 name.AsCString());
 }
 
 bool lldb_private::formatters::IsMsvcStlDeque(ValueObject &valobj) {

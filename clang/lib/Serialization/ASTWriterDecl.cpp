@@ -361,8 +361,7 @@ namespace clang {
 // compilation of that unit, not by its users. (Inline variables are still
 // emitted in module users.)
 static bool shouldVarGenerateHereOnly(const VarDecl *VD) {
-  if (VD->getStorageDuration() != SD_Static &&
-      VD->getStorageDuration() != SD_Thread)
+  if (VD->getStorageDuration() != SD_Static)
     return false;
 
   if (VD->getDescribedVarTemplate())
