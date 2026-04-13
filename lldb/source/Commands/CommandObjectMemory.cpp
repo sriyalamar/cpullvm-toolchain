@@ -670,9 +670,10 @@ protected:
       }
 
       if (bytes_read < total_byte_size)
-        result.AppendWarningWithFormatv("Not all bytes ({0} / {1}) "
-                                        "were able to be read from {2:x}.",
-                                        bytes_read, total_byte_size, addr);
+        result.AppendWarningWithFormat(
+            "Not all bytes (%" PRIu64 "/%" PRIu64
+            ") were able to be read from 0x%" PRIx64 ".\n",
+            (uint64_t)bytes_read, (uint64_t)total_byte_size, addr);
     } else {
       // we treat c-strings as a special case because they do not have a fixed
       // size
@@ -711,9 +712,9 @@ protected:
         }
 
         if (item_byte_size == read) {
-          result.AppendWarningWithFormatv(
-              "unable to find a NULL terminated string at {0:x}"
-              ". Consider increasing the maximum read length.",
+          result.AppendWarningWithFormat(
+              "unable to find a NULL terminated string at 0x%" PRIx64
+              ". Consider increasing the maximum read length.\n",
               data_addr);
           --read;
           break_on_no_NULL = true;
@@ -1278,7 +1279,10 @@ protected:
       return;
     }
 
-    StreamString buffer(Stream::eBinary, process->GetByteOrder());
+    StreamString buffer(
+        Stream::eBinary,
+        process->GetTarget().GetArchitecture().GetAddressByteSize(),
+        process->GetTarget().GetArchitecture().GetByteOrder());
 
     OptionValueUInt64 &byte_size_value = m_format_options.GetByteSizeValue();
     size_t item_byte_size = byte_size_value.GetCurrentValue();
@@ -1332,7 +1336,7 @@ protected:
       return;
     } else if (item_byte_size == 0) {
       if (m_format_options.GetFormat() == eFormatPointer)
-        item_byte_size = process->GetAddressByteSize();
+        item_byte_size = buffer.GetAddressByteSize();
       else
         item_byte_size = 1;
     }
@@ -1684,11 +1688,11 @@ protected:
         range_info.GetRange().GetRangeEnd(), range_info.GetReadable(),
         range_info.GetWritable(), range_info.GetExecutable(), name ? " " : "",
         name, section_name ? " " : "", section_name);
-    LazyBool memory_tagged = range_info.GetMemoryTagged();
-    if (memory_tagged == eLazyBoolYes)
+    MemoryRegionInfo::OptionalBool memory_tagged = range_info.GetMemoryTagged();
+    if (memory_tagged == MemoryRegionInfo::OptionalBool::eYes)
       result.AppendMessage("memory tagging: enabled");
-    LazyBool is_shadow_stack = range_info.IsShadowStack();
-    if (is_shadow_stack == eLazyBoolYes)
+    MemoryRegionInfo::OptionalBool is_shadow_stack = range_info.IsShadowStack();
+    if (is_shadow_stack == MemoryRegionInfo::OptionalBool::eYes)
       result.AppendMessage("shadow stack: yes");
 
     const std::optional<std::vector<addr_t>> &dirty_page_list =
@@ -1700,16 +1704,15 @@ protected:
           page_count);
       if (page_count > 0) {
         bool print_comma = false;
-        Stream &strm = result.GetOutputStream();
-        strm << "Dirty pages: ";
+        result.AppendMessageWithFormat("Dirty pages: ");
         for (size_t i = 0; i < page_count; i++) {
           if (print_comma)
-            strm << ", ";
+            result.AppendMessageWithFormat(", ");
           else
             print_comma = true;
-          strm << llvm::formatv("{0:x}", (*dirty_page_list)[i]);
+          result.AppendMessageWithFormat("0x%" PRIx64, (*dirty_page_list)[i]);
         }
-        strm << ".\n";
+        result.AppendMessage(".");
       }
     }
   }

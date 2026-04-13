@@ -13,7 +13,6 @@
 #include "clang/Frontend/ASTConsumers.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/ErrorExtras.h"
 #include "llvm/Support/FormatAdapters.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -1345,8 +1344,6 @@ QualType GetValueParamType(const clang::TemplateArgument &argument) {
     return argument.getIntegralType();
   case TemplateArgument::StructuralValue:
     return argument.getStructuralValueType();
-  case TemplateArgument::Declaration:
-    return argument.getParamTypeForDecl();
   default:
     return {};
   }
@@ -2608,7 +2605,7 @@ TypeSystemClang::GetDeclContextForType(clang::QualType type) {
 /// by the specified \ref allow_completion). If we fail to return a *complete*
 /// type, returns nullptr.
 static const clang::RecordType *
-GetCompleteRecordType(const clang::ASTContext *ast, clang::QualType qual_type) {
+GetCompleteRecordType(clang::ASTContext *ast, clang::QualType qual_type) {
   assert(qual_type->isRecordType());
 
   const auto *tag_type = llvm::cast<clang::RecordType>(qual_type.getTypePtr());
@@ -2649,7 +2646,7 @@ GetCompleteRecordType(const clang::ASTContext *ast, clang::QualType qual_type) {
 /// function will try to complete the type if necessary (and allowed
 /// by the specified \ref allow_completion). If we fail to return a *complete*
 /// type, returns nullptr.
-static const clang::EnumType *GetCompleteEnumType(const clang::ASTContext *ast,
+static const clang::EnumType *GetCompleteEnumType(clang::ASTContext *ast,
                                                   clang::QualType qual_type) {
   assert(qual_type->isEnumeralType());
   assert(ast);
@@ -2682,7 +2679,7 @@ static const clang::EnumType *GetCompleteEnumType(const clang::ASTContext *ast,
 /// by the specified \ref allow_completion). If we fail to return a *complete*
 /// type, returns nullptr.
 static const clang::ObjCObjectType *
-GetCompleteObjCObjectType(const clang::ASTContext *ast, QualType qual_type) {
+GetCompleteObjCObjectType(clang::ASTContext *ast, QualType qual_type) {
   assert(qual_type->isObjCObjectType());
   assert(ast);
 
@@ -2713,7 +2710,7 @@ GetCompleteObjCObjectType(const clang::ASTContext *ast, QualType qual_type) {
   return objc_class_type;
 }
 
-static bool GetCompleteQualType(const clang::ASTContext *ast,
+static bool GetCompleteQualType(clang::ASTContext *ast,
                                 clang::QualType qual_type) {
   qual_type = RemoveWrappingTypes(qual_type);
   const clang::Type::TypeClass type_class = qual_type->getTypeClass();
@@ -7023,7 +7020,8 @@ TypeSystemClang::GetIndexOfChildWithName(lldb::opaque_compiler_type_t type,
       break;
     }
   }
-  return llvm::createStringErrorV("type has no child named '{0}'", name);
+  return llvm::createStringError("Type has no child named '%s'",
+                                 name.str().c_str());
 }
 
 CompilerType
@@ -8604,7 +8602,7 @@ void TypeSystemClang::DumpFromSymbolFile(Stream &s,
       if (symbol_name != type->GetName().GetStringRef())
         continue;
 
-    s << type->GetName() << "\n";
+    s << type->GetName().AsCString() << "\n";
 
     CompilerType full_type = type->GetFullCompilerType();
     if (clang::TagDecl *tag_decl = GetAsTagDecl(full_type)) {

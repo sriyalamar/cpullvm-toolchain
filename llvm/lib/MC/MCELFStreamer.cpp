@@ -22,7 +22,6 @@
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCFixup.h"
-#include "llvm/MC/MCLFI.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSection.h"
@@ -373,9 +372,6 @@ void MCELFStreamer::finishImpl() {
     createAttributesSection("gnu", ".gnu.attributes", ELF::SHT_GNU_ATTRIBUTES,
                             DummyAttributeSection, GNUAttributes);
   }
-
-  if (Ctx.getTargetTriple().isLFI())
-    emitLFINoteSection(*this, Ctx);
 
   finalizeCGProfile();
   emitFrames();

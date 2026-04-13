@@ -118,7 +118,7 @@ static DWARFExpression MakeLocationExpressionInternal(lldb::ModuleSP module,
     return DWARFExpression();
 
   RegisterKind register_kind = eRegisterKindDWARF;
-  StreamBuffer<32> stream(Stream::eBinary, byte_order);
+  StreamBuffer<32> stream(Stream::eBinary, address_size, byte_order);
 
   if (!writer(stream, register_kind))
     return DWARFExpression();
@@ -166,9 +166,8 @@ static bool MakeRegisterBasedIndirectLocationExpressionInternal(
     return false;
 
   stream.PutHex8(llvm::dwarf::DW_OP_deref);
-  stream.PutHex8(llvm::dwarf::DW_OP_consts);
+  stream.PutHex8(llvm::dwarf::DW_OP_plus_uconst);
   stream.PutSLEB128(offset);
-  stream.PutHex8(llvm::dwarf::DW_OP_plus);
 
   return true;
 }
@@ -230,31 +229,6 @@ DWARFExpression lldb_private::npdb::MakeVFrameRelLocationExpression(
       });
 }
 
-DWARFExpression lldb_private::npdb::MakeVFrameRelIndirLocationExpression(
-    llvm::StringRef fpo_program, int32_t offset, int32_t offset_in_udt,
-    lldb::ModuleSP module) {
-  return MakeLocationExpressionInternal(
-      module, [&](Stream &stream, RegisterKind &register_kind) -> bool {
-        const ArchSpec &architecture = module->GetArchitecture();
-
-        if (!EmitVFrameEvaluationDWARFExpression(
-                fpo_program, architecture.GetMachine(), stream))
-          return false;
-
-        stream.PutHex8(llvm::dwarf::DW_OP_consts);
-        stream.PutSLEB128(offset);
-        stream.PutHex8(llvm::dwarf::DW_OP_plus);
-        stream.PutHex8(llvm::dwarf::DW_OP_deref);
-        stream.PutHex8(llvm::dwarf::DW_OP_consts);
-        stream.PutSLEB128(offset_in_udt);
-        stream.PutHex8(llvm::dwarf::DW_OP_plus);
-
-        register_kind = eRegisterKindLLDB;
-
-        return true;
-      });
-}
-
 DWARFExpression lldb_private::npdb::MakeGlobalLocationExpression(
     uint16_t section, uint32_t offset, ModuleSP module) {
   assert(section > 0);
@@ -271,9 +245,8 @@ DWARFExpression lldb_private::npdb::MakeGlobalLocationExpression(
         if (!section_ptr)
           return false;
 
-        const ArchSpec &arch = module->GetArchitecture();
         stream.PutMaxHex64(section_ptr->GetFileAddress() + offset,
-                           arch.GetAddressByteSize(), arch.GetByteOrder());
+                           stream.GetAddressByteSize(), stream.GetByteOrder());
 
         return true;
       });

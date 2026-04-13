@@ -941,7 +941,7 @@ void cleanup_inside_try_body() {
 // LLVM:   br label %[[TRY_CONT:.*]]
 // LLVM: [[LANDING_PAD]]:
 // LLVM:   %[[LP:.*]] = landingpad { ptr, i32 }
-// LLVM:           catch ptr null
+// LLVM:           cleanup
 // LLVM:   %[[EXN_OBJ:.*]] = extractvalue { ptr, i32 } %[[LP]], 0
 // LLVM:   %[[EH_SELECTOR_VAL:.*]] = extractvalue { ptr, i32 } %[[LP]], 1
 // LLVM:   br label %[[CLEANUP_LANDING:.*]]

@@ -292,11 +292,10 @@ static KnownFPClass fadd_impl(const KnownFPClass &KnownLHS,
                               const KnownFPClass &KnownRHS, DenormalMode Mode) {
   KnownFPClass Known;
 
-  // Adding positive and negative infinity produces NaN, but only if both
-  // opposite-sign infinity combinations are possible.
+  // Adding positive and negative infinity produces NaN.
+  // TODO: Check sign of infinities.
   if (KnownLHS.isKnownNeverNaN() && KnownRHS.isKnownNeverNaN() &&
-      (KnownLHS.isKnownNever(fcPosInf) || KnownRHS.isKnownNever(fcNegInf)) &&
-      (KnownLHS.isKnownNever(fcNegInf) || KnownRHS.isKnownNever(fcPosInf)))
+      (KnownLHS.isKnownNeverInfinity() || KnownRHS.isKnownNeverInfinity()))
     Known.knownNot(fcNan);
 
   if (KnownLHS.cannotBeOrderedLessThanZero() &&

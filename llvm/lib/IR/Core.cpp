@@ -2880,7 +2880,7 @@ LLVMValueRef LLVMGetBasicBlockParent(LLVMBasicBlockRef BB) {
 }
 
 LLVMValueRef LLVMGetBasicBlockTerminator(LLVMBasicBlockRef BB) {
-  return wrap(unwrap(BB)->getTerminatorOrNull());
+  return wrap(unwrap(BB)->getTerminator());
 }
 
 unsigned LLVMCountBasicBlocks(LLVMValueRef FnRef) {

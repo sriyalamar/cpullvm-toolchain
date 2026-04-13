@@ -1044,9 +1044,6 @@ bool FunctionSpecializer::isCandidateFunction(Function *F) {
   if (F->hasFnAttribute(Attribute::NoDuplicate))
     return false;
 
-  if (F->hasOptSize())
-    return false;
-
   // Do not specialize the cloned function again.
   if (Specializations.contains(F))
     return false;

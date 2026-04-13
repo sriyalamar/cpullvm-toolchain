@@ -93,12 +93,8 @@ static VectorType encodeVectorTypeTo(VectorType currentVecType,
 static xevm::LoadCacheControl
 translateLoadXeGPUCacheHint(std::optional<xegpu::CachePolicy> L1hint,
                             std::optional<xegpu::CachePolicy> L3hint) {
-  // If no hints are provided, use the default cache control.
-  if (!L1hint && !L3hint)
-    return xevm::LoadCacheControl::USE_DEFAULT;
-  // If only one of the hints is provided, use the default for the other level.
-  auto L1hintVal = L1hint.value_or(xegpu::CachePolicy::CACHED);
-  auto L3hintVal = L3hint.value_or(xegpu::CachePolicy::CACHED);
+  auto L1hintVal = L1hint.value_or(xegpu::CachePolicy::UNCACHED);
+  auto L3hintVal = L3hint.value_or(xegpu::CachePolicy::UNCACHED);
   switch (L1hintVal) {
   case xegpu::CachePolicy::CACHED:
     if (L3hintVal == xegpu::CachePolicy::CACHED)
@@ -131,12 +127,8 @@ translateLoadXeGPUCacheHint(std::optional<xegpu::CachePolicy> L1hint,
 static xevm::StoreCacheControl
 translateStoreXeGPUCacheHint(std::optional<xegpu::CachePolicy> L1hint,
                              std::optional<xegpu::CachePolicy> L3hint) {
-  // If no hints are provided, use the default cache control.
-  if (!L1hint && !L3hint)
-    return xevm::StoreCacheControl::USE_DEFAULT;
-  // If only one of the hints is provided, use the default for the other level.
   auto L1hintVal = L1hint.value_or(xegpu::CachePolicy::UNCACHED);
-  auto L3hintVal = L3hint.value_or(xegpu::CachePolicy::WRITE_BACK);
+  auto L3hintVal = L3hint.value_or(xegpu::CachePolicy::UNCACHED);
   switch (L1hintVal) {
   case xegpu::CachePolicy::UNCACHED:
     if (L3hintVal == xegpu::CachePolicy::UNCACHED)

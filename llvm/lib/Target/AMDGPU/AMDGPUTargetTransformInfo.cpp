@@ -1801,23 +1801,24 @@ unsigned GCNTTIImpl::getNumberOfParts(Type *Tp) const {
   return BaseT::getNumberOfParts(Tp);
 }
 
-ValueUniformity GCNTTIImpl::getValueUniformity(const Value *V) const {
+InstructionUniformity
+GCNTTIImpl::getInstructionUniformity(const Value *V) const {
   if (const IntrinsicInst *Intrinsic = dyn_cast<IntrinsicInst>(V)) {
     switch (Intrinsic->getIntrinsicID()) {
     case Intrinsic::amdgcn_wave_shuffle:
-      return ValueUniformity::Custom;
+      return InstructionUniformity::Custom;
     default:
       break;
     }
   }
 
   if (isAlwaysUniform(V))
-    return ValueUniformity::AlwaysUniform;
+    return InstructionUniformity::AlwaysUniform;
 
   if (isSourceOfDivergence(V))
-    return ValueUniformity::NeverUniform;
+    return InstructionUniformity::NeverUniform;
 
-  return ValueUniformity::Default;
+  return InstructionUniformity::Default;
 }
 
 InstructionCost GCNTTIImpl::getScalingFactorCost(Type *Ty, GlobalValue *BaseGV,

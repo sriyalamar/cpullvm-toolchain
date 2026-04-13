@@ -7,7 +7,6 @@ static_library("lib") {
   ]
   sources = [
     "Context.cpp",
-    "ExecutorBase.cpp",
     "Interpreter.cpp",
     "Value.cpp",
   ]

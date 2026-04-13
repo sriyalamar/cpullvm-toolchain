@@ -37,8 +37,9 @@ BreakpointResolverName::BreakpointResolverName(
     if (!m_regex.IsValid()) {
       Log *log = GetLog(LLDBLog::Breakpoints);
 
-      LLDB_LOGF(log, "warning: function name regexp: \"%s\" did not compile.",
-                name_cstr);
+      if (log)
+        log->Warning("function name regexp: \"%s\" did not compile.",
+                     name_cstr);
     }
   } else {
     AddNameLookup(ConstString(name_cstr), name_type_mask);
@@ -286,7 +287,8 @@ BreakpointResolverName::SearchCallback(SearchFilter &filter,
     }
     break;
   case Breakpoint::Glob:
-    LLDB_LOG(log, "warning: glob is not supported yet.");
+    if (log)
+      log->Warning("glob is not supported yet.");
     break;
   }
 

@@ -402,8 +402,7 @@ void Decl::setLexicalDeclContext(DeclContext *DC) {
   }
 
   assert(
-      ((getModuleOwnershipKind() != ModuleOwnershipKind::VisibleWhenImported &&
-        getModuleOwnershipKind() != ModuleOwnershipKind::VisiblePromoted) ||
+      (getModuleOwnershipKind() != ModuleOwnershipKind::VisibleWhenImported ||
        getOwningModule()) &&
       "hidden declaration has no owning module");
 }

@@ -26,8 +26,8 @@ using namespace omp;
 using namespace target;
 
 template <uint32_t NumLanes>
-rpc::RPCStatus handleOffloadOpcodes(plugin::GenericDeviceTy &Device,
-                                    rpc::Server::Port &Port) {
+rpc::Status handleOffloadOpcodes(plugin::GenericDeviceTy &Device,
+                                 rpc::Server::Port &Port) {
 
   switch (Port.get_opcode()) {
   case LIBC_MALLOC: {
@@ -74,9 +74,9 @@ rpc::RPCStatus handleOffloadOpcodes(plugin::GenericDeviceTy &Device,
   return rpc::RPC_SUCCESS;
 }
 
-static rpc::RPCStatus handleOffloadOpcodes(plugin::GenericDeviceTy &Device,
-                                           rpc::Server::Port &Port,
-                                           uint32_t NumLanes) {
+static rpc::Status handleOffloadOpcodes(plugin::GenericDeviceTy &Device,
+                                        rpc::Server::Port &Port,
+                                        uint32_t NumLanes) {
   if (NumLanes == 1)
     return handleOffloadOpcodes<1>(Device, Port);
   else if (NumLanes == 32)
@@ -87,7 +87,7 @@ static rpc::RPCStatus handleOffloadOpcodes(plugin::GenericDeviceTy &Device,
     return rpc::RPC_ERROR;
 }
 
-static rpc::RPCStatus
+static rpc::Status
 runServer(plugin::GenericDeviceTy &Device, void *Buffer,
           llvm::SmallSetVector<RPCServerTy::RPCServerCallbackTy, 0> &Callbacks,
           bool &ClientInUse) {
@@ -100,11 +100,11 @@ runServer(plugin::GenericDeviceTy &Device, void *Buffer,
     return rpc::RPC_SUCCESS;
   ClientInUse = true;
 
-  rpc::RPCStatus Status = rpc::RPC_UNHANDLED_OPCODE;
+  rpc::Status Status = rpc::RPC_UNHANDLED_OPCODE;
   const uint32_t NumLanes = Device.getRPCNumLanes();
 
   for (RPCServerTy::RPCServerCallbackTy Callback : Callbacks) {
-    Status = static_cast<rpc::RPCStatus>(Callback(&*Port, NumLanes));
+    Status = static_cast<rpc::Status>(Callback(&*Port, NumLanes));
     if (Status != rpc::RPC_UNHANDLED_OPCODE)
       break;
   }
@@ -113,11 +113,11 @@ runServer(plugin::GenericDeviceTy &Device, void *Buffer,
     Status = handleOffloadOpcodes(Device, *Port, NumLanes);
 
   if (Status == rpc::RPC_UNHANDLED_OPCODE)
-    Status = rpc::handle_libc_opcodes(*Port, NumLanes);
+    Status = LIBC_NAMESPACE::shared::handle_libc_opcodes(*Port, NumLanes);
 
 #ifdef OFFLOAD_HAS_FLANG_RT
   if (Status == rpc::RPC_UNHANDLED_OPCODE)
-    Status = static_cast<rpc::RPCStatus>(
+    Status = static_cast<rpc::Status>(
         Fortran::runtime::io::IONAME(HandleRPCOpcodes)(&*Port, NumLanes));
 #endif
 

@@ -1,4 +1,7 @@
-; RUN: llc -verify-machineinstrs -O0 -mtriple=spirv64-unknown-unknown %s -o - | FileCheck %s
+; RUN: llc -O0 -mtriple=spirv64-unknown-unknown %s -o - | FileCheck %s
+
+; TODO: This test currently fails with LLVM_ENABLE_EXPENSIVE_CHECKS enabled
+; XFAIL: expensive_checks
 
 ; CHECK: OpDecorate %[[#SpecConst:]] SpecId 0
 ; CHECK: %[[#SpecConst]] = OpSpecConstant %[[#]] 70

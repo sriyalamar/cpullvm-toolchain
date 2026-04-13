@@ -155,22 +155,6 @@ let cppNamespace = "::cir" in {
       /*defaultImplementation=*/[{
         return cir::isWeakForLinker($_op.getLinkage());
       }]
-      >,
-      InterfaceMethod<"",
-      "void", "setSection", (ins "mlir::StringAttr":$val), [{}],
-      /*defaultImplementation=*/[{
-        if (val)
-          $_op->setAttr("section", val);
-        else
-          $_op->removeAttr("section");
-      }]
-      >,
-      InterfaceMethod<"",
-      "mlir::StringAttr", "getSectionAttr", (ins), [{}],
-      /*defaultImplementation=*/[{
-        return mlir::dyn_cast_if_present<mlir::StringAttr>(
-            $_op->getAttr("section"));
-      }]
       >
     ];
     let extraClassDeclaration = [{

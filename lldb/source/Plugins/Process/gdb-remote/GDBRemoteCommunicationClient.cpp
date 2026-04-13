@@ -1610,28 +1610,28 @@ Status GDBRemoteCommunicationClient::GetMemoryRegionInfo(
           saw_permissions = true;
           if (region_info.GetRange().Contains(addr)) {
             if (value.contains('r'))
-              region_info.SetReadable(eLazyBoolYes);
+              region_info.SetReadable(MemoryRegionInfo::eYes);
             else
-              region_info.SetReadable(eLazyBoolNo);
+              region_info.SetReadable(MemoryRegionInfo::eNo);
 
             if (value.contains('w'))
-              region_info.SetWritable(eLazyBoolYes);
+              region_info.SetWritable(MemoryRegionInfo::eYes);
             else
-              region_info.SetWritable(eLazyBoolNo);
+              region_info.SetWritable(MemoryRegionInfo::eNo);
 
             if (value.contains('x'))
-              region_info.SetExecutable(eLazyBoolYes);
+              region_info.SetExecutable(MemoryRegionInfo::eYes);
             else
-              region_info.SetExecutable(eLazyBoolNo);
+              region_info.SetExecutable(MemoryRegionInfo::eNo);
 
-            region_info.SetMapped(eLazyBoolYes);
+            region_info.SetMapped(MemoryRegionInfo::eYes);
           } else {
             // The reported region does not contain this address -- we're
             // looking at an unmapped page
-            region_info.SetReadable(eLazyBoolNo);
-            region_info.SetWritable(eLazyBoolNo);
-            region_info.SetExecutable(eLazyBoolNo);
-            region_info.SetMapped(eLazyBoolNo);
+            region_info.SetReadable(MemoryRegionInfo::eNo);
+            region_info.SetWritable(MemoryRegionInfo::eNo);
+            region_info.SetExecutable(MemoryRegionInfo::eNo);
+            region_info.SetMapped(MemoryRegionInfo::eNo);
           }
         } else if (name == "name") {
           StringExtractorGDBRemote name_extractor(value);
@@ -1639,8 +1639,8 @@ Status GDBRemoteCommunicationClient::GetMemoryRegionInfo(
           name_extractor.GetHexByteString(name);
           region_info.SetName(name.c_str());
         } else if (name == "flags") {
-          region_info.SetMemoryTagged(eLazyBoolNo);
-          region_info.SetIsShadowStack(eLazyBoolNo);
+          region_info.SetMemoryTagged(MemoryRegionInfo::eNo);
+          region_info.SetIsShadowStack(MemoryRegionInfo::eNo);
 
           llvm::StringRef flags = value;
           llvm::StringRef flag;
@@ -1650,17 +1650,17 @@ Status GDBRemoteCommunicationClient::GetMemoryRegionInfo(
             // To account for trailing whitespace
             if (flag.size()) {
               if (flag == "mt")
-                region_info.SetMemoryTagged(eLazyBoolYes);
+                region_info.SetMemoryTagged(MemoryRegionInfo::eYes);
               else if (flag == "ss")
-                region_info.SetIsShadowStack(eLazyBoolYes);
+                region_info.SetIsShadowStack(MemoryRegionInfo::eYes);
             }
           }
         } else if (name == "type") {
           for (llvm::StringRef entry : llvm::split(value, ',')) {
             if (entry == "stack")
-              region_info.SetIsStackMemory(eLazyBoolYes);
+              region_info.SetIsStackMemory(MemoryRegionInfo::eYes);
             else if (entry == "heap")
-              region_info.SetIsStackMemory(eLazyBoolNo);
+              region_info.SetIsStackMemory(MemoryRegionInfo::eNo);
           }
         } else if (name == "error") {
           StringExtractorGDBRemote error_extractor(value);
@@ -1687,10 +1687,10 @@ Status GDBRemoteCommunicationClient::GetMemoryRegionInfo(
         // We got a valid address range back but no permissions -- which means
         // this is an unmapped page
         if (!saw_permissions) {
-          region_info.SetReadable(eLazyBoolNo);
-          region_info.SetWritable(eLazyBoolNo);
-          region_info.SetExecutable(eLazyBoolNo);
-          region_info.SetMapped(eLazyBoolNo);
+          region_info.SetReadable(MemoryRegionInfo::eNo);
+          region_info.SetWritable(MemoryRegionInfo::eNo);
+          region_info.SetExecutable(MemoryRegionInfo::eNo);
+          region_info.SetMapped(MemoryRegionInfo::eNo);
         }
       } else {
         // We got an invalid address range back
@@ -1799,14 +1799,14 @@ Status GDBRemoteCommunicationClient::LoadQXferMemoryMap() {
     region.GetRange().SetRangeBase(start);
     region.GetRange().SetByteSize(length);
     if (type == "rom") {
-      region.SetReadable(eLazyBoolYes);
+      region.SetReadable(MemoryRegionInfo::eYes);
       this->m_qXfer_memory_map.push_back(region);
     } else if (type == "ram") {
-      region.SetReadable(eLazyBoolYes);
-      region.SetWritable(eLazyBoolYes);
+      region.SetReadable(MemoryRegionInfo::eYes);
+      region.SetWritable(MemoryRegionInfo::eYes);
       this->m_qXfer_memory_map.push_back(region);
     } else if (type == "flash") {
-      region.SetFlash(eLazyBoolYes);
+      region.SetFlash(MemoryRegionInfo::eYes);
       memory_node.ForEachChildElement(
           [&region](const XMLNode &prop_node) -> bool {
             if (!prop_node.IsElement())

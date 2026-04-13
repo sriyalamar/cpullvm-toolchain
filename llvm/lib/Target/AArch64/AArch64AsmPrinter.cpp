@@ -2697,10 +2697,8 @@ AArch64AsmPrinter::lowerConstantPtrAuth(const ConstantPtrAuth &CPA) {
     else if (Offset.slt(0))
       Sym = MCBinaryExpr::createSub(
           Sym, MCConstantExpr::create((-Offset).getSExtValue(), Ctx), Ctx);
-  } else if (isa<ConstantPointerNull>(BaseGV)) {
-    Sym = MCConstantExpr::create(Offset.getSExtValue(), Ctx);
   } else {
-    reportFatalUsageError("unsupported constant expression in ptrauth pointer");
+    Sym = MCConstantExpr::create(Offset.getSExtValue(), Ctx);
   }
 
   const MCExpr *DSExpr = nullptr;

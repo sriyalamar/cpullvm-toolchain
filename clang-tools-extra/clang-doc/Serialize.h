@@ -90,16 +90,16 @@ private:
   void getTemplateParameters(const TemplateParameterList *TemplateParams,
                              llvm::raw_ostream &Stream);
 
-  StringRef getFunctionPrototype(const FunctionDecl *FuncDecl);
+  llvm::SmallString<256> getFunctionPrototype(const FunctionDecl *FuncDecl);
 
-  StringRef getTypeAlias(const TypeAliasDecl *Alias);
+  llvm::SmallString<16> getTypeAlias(const TypeAliasDecl *Alias);
 
-  StringRef
+  llvm::SmallString<128>
   getInfoRelativePath(const llvm::SmallVectorImpl<doc::Reference> &Namespaces);
 
-  StringRef getInfoRelativePath(const Decl *D);
+  llvm::SmallString<128> getInfoRelativePath(const Decl *D);
 
-  llvm::StringRef getSourceCode(const Decl *D, const SourceRange &R);
+  std::string getSourceCode(const Decl *D, const SourceRange &R);
 
   void parseFullComment(const FullComment *C, CommentInfo &CI);
 

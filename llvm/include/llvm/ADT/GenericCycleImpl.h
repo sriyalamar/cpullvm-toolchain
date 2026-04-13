@@ -48,33 +48,36 @@ template <typename ContextT>
 void GenericCycle<ContextT>::getExitBlocks(
     SmallVectorImpl<BlockT *> &TmpStorage) const {
   if (!ExitBlocksCache.empty()) {
-    TmpStorage.append(ExitBlocksCache.begin(), ExitBlocksCache.end());
+    TmpStorage = ExitBlocksCache;
     return;
   }
 
+  TmpStorage.clear();
+
   size_t NumExitBlocks = 0;
   for (BlockT *Block : blocks()) {
-    llvm::append_range(ExitBlocksCache, successors(Block));
+    llvm::append_range(TmpStorage, successors(Block));
 
-    for (size_t Idx = NumExitBlocks, End = ExitBlocksCache.size(); Idx < End;
+    for (size_t Idx = NumExitBlocks, End = TmpStorage.size(); Idx < End;
          ++Idx) {
-      BlockT *Succ = ExitBlocksCache[Idx];
+      BlockT *Succ = TmpStorage[Idx];
       if (!contains(Succ)) {
-        auto ExitEndIt = ExitBlocksCache.begin() + NumExitBlocks;
-        if (std::find(ExitBlocksCache.begin(), ExitEndIt, Succ) == ExitEndIt)
-          ExitBlocksCache[NumExitBlocks++] = Succ;
+        auto ExitEndIt = TmpStorage.begin() + NumExitBlocks;
+        if (std::find(TmpStorage.begin(), ExitEndIt, Succ) == ExitEndIt)
+          TmpStorage[NumExitBlocks++] = Succ;
       }
     }
 
-    ExitBlocksCache.resize(NumExitBlocks);
+    TmpStorage.resize(NumExitBlocks);
   }
-
-  TmpStorage.append(ExitBlocksCache.begin(), ExitBlocksCache.end());
+  ExitBlocksCache.append(TmpStorage.begin(), TmpStorage.end());
 }
 
 template <typename ContextT>
 void GenericCycle<ContextT>::getExitingBlocks(
     SmallVectorImpl<BlockT *> &TmpStorage) const {
+  TmpStorage.clear();
+
   for (BlockT *Block : blocks()) {
     for (BlockT *Succ : successors(Block)) {
       if (!contains(Succ)) {

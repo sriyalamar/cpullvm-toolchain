@@ -183,7 +183,6 @@ LogicalResult spirv::Deserializer::processInstruction(
   case spirv::Opcode::OpTypeArray:
   case spirv::Opcode::OpTypeFunction:
   case spirv::Opcode::OpTypeImage:
-  case spirv::Opcode::OpTypeSampler:
   case spirv::Opcode::OpTypeSampledImage:
   case spirv::Opcode::OpTypeRuntimeArray:
   case spirv::Opcode::OpTypeStruct:

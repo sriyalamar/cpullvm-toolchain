@@ -112,10 +112,8 @@ void MissingStdForwardCheck::registerMatchers(MatchFinder *Finder) {
       allOf(hasCaptureKind(LambdaCaptureKind::LCK_ByRef), RefToParm));
 
   auto CapturedInBody = lambdaExpr(anyOf(CaptureInRef, CaptureByRefExplicit));
-  auto IsBoundCall = ignoringParenImpCasts(equalsBoundNode("call"));
-  auto CapturedInCaptureList = hasAnyCapture(capturesVar(varDecl(
-      hasInitializer(anyOf(IsBoundCall, initListExpr(hasInit(0, IsBoundCall)),
-                           parenListExpr(has(expr(IsBoundCall))))))));
+  auto CapturedInCaptureList = hasAnyCapture(capturesVar(
+      varDecl(hasInitializer(ignoringParenImpCasts(equalsBoundNode("call"))))));
 
   auto CapturedInLambda = hasDeclContext(cxxRecordDecl(
       isLambda(),
@@ -145,9 +143,7 @@ void MissingStdForwardCheck::registerMatchers(MatchFinder *Finder) {
           hasAncestor(functionDecl().bind("func")),
           hasAncestor(functionDecl(
               isDefinition(), equalsBoundNode("func"), ToParam,
-              unless(anyOf(
-                  isDeleted(),
-                  traverse(TK_AsIs, hasDescendant(ForwardCallMatcher))))))),
+              unless(anyOf(isDeleted(), hasDescendant(ForwardCallMatcher)))))),
       this);
 }
 

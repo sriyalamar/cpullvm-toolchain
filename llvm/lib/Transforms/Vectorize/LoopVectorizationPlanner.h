@@ -561,10 +561,9 @@ public:
   /// for each VF.
   VPlan &getPlanFor(ElementCount VF) const;
 
-  /// Compute and return the most profitable vectorization factor and the
-  /// corresponding best VPlan. Also collect all profitable VFs in
-  /// ProfitableVFs.
-  std::pair<VectorizationFactor, VPlan *> computeBestVF();
+  /// Compute and return the most profitable vectorization factor. Also collect
+  /// all profitable VFs in ProfitableVFs.
+  VectorizationFactor computeBestVF();
 
   /// \return The desired interleave count.
   /// If interleave count has been specified by metadata it will be returned.
@@ -576,22 +575,18 @@ public:
   /// Generate the IR code for the vectorized loop captured in VPlan \p BestPlan
   /// according to the best selected \p VF and  \p UF.
   ///
-  /// TODO: \p EpilogueVecKind should be removed once the re-use issue has been
+  /// TODO: \p VectorizingEpilogue indicates if the executed VPlan is for the
+  /// epilogue vector loop. It should be removed once the re-use issue has been
   /// fixed.
   ///
   /// Returns a mapping of SCEVs to their expanded IR values.
   /// Note that this is a temporary workaround needed due to the current
   /// epilogue handling.
-  enum class EpilogueVectorizationKind {
-    None,     ///< Not part of epilogue vectorization.
-    MainLoop, ///< Vectorizing the main loop of epilogue vectorization.
-    Epilogue  ///< Vectorizing the epilogue loop.
-  };
-  DenseMap<const SCEV *, Value *>
-  executePlan(ElementCount VF, unsigned UF, VPlan &BestPlan,
-              InnerLoopVectorizer &LB, DominatorTree *DT,
-              EpilogueVectorizationKind EpilogueVecKind =
-                  EpilogueVectorizationKind::None);
+  DenseMap<const SCEV *, Value *> executePlan(ElementCount VF, unsigned UF,
+                                              VPlan &BestPlan,
+                                              InnerLoopVectorizer &LB,
+                                              DominatorTree *DT,
+                                              bool VectorizingEpilogue);
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void printPlans(raw_ostream &O);
@@ -611,12 +606,11 @@ public:
   getDecisionAndClampRange(const std::function<bool(ElementCount)> &Predicate,
                            VFRange &Range);
 
-  /// \return A VPlan for the most profitable epilogue vectorization, with its
-  /// VF narrowed to the chosen factor. The returned plan is a duplicate.
-  /// Returns nullptr if epilogue vectorization is not supported or not
-  /// profitable for the loop.
-  std::unique_ptr<VPlan>
-  selectBestEpiloguePlan(VPlan &MainPlan, ElementCount MainLoopVF, unsigned IC);
+  /// \return The most profitable vectorization factor and the cost of that VF
+  /// for vectorizing the epilogue. Returns VectorizationFactor::Disabled if
+  /// epilogue vectorization is not supported for the loop.
+  VectorizationFactor selectEpilogueVectorizationFactor(ElementCount MainLoopVF,
+                                                        unsigned IC);
 
   /// Emit remarks for recipes with invalid costs in the available VPlans.
   void emitInvalidCostRemarks(OptimizationRemarkEmitter *ORE);
@@ -625,10 +619,6 @@ public:
   /// based on its trip count.
   void addMinimumIterationCheck(VPlan &Plan, ElementCount VF, unsigned UF,
                                 ElementCount MinProfitableTripCount) const;
-
-  /// Attach the runtime checks of \p RTChecks to \p Plan.
-  void attachRuntimeChecks(VPlan &Plan, GeneratedRTChecks &RTChecks,
-                           bool HasBranchWeights) const;
 
   /// Update loop metadata and profile info for both the scalar remainder loop
   /// and \p VectorLoop, if it exists. Keeps all loop hints from the original
@@ -682,6 +672,10 @@ private:
                                      VPRecipeBuilder &RecipeBuilder,
                                      ElementCount MinVF);
 
+  /// Attach the runtime checks of \p RTChecks to \p Plan.
+  void attachRuntimeChecks(VPlan &Plan, GeneratedRTChecks &RTChecks,
+                           bool HasBranchWeights) const;
+
 #ifndef NDEBUG
   /// \return The most profitable vectorization factor for the available VPlans
   /// and the cost of that VF.
@@ -705,8 +699,8 @@ private:
                         bool IsEpilogue = false) const;
 
   /// Determines if we have the infrastructure to vectorize the loop and its
-  /// epilogue, assuming the main loop is vectorized by \p MainPlan.
-  bool isCandidateForEpilogueVectorization(VPlan &MainPlan) const;
+  /// epilogue, assuming the main loop is vectorized by \p VF.
+  bool isCandidateForEpilogueVectorization(const ElementCount VF) const;
 };
 
 } // namespace llvm

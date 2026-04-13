@@ -25,9 +25,11 @@ def XeGPU_DpasOprType: FixedVectorOfRankAndType<[1, 2, 3], [XeGPU_ScalarType]>;
 def XeGPU_DpasResType: FixedVectorOfRankAndType<[1, 2], [XeGPU_ScalarType]>;
 def XeGPU_OffsetType: FixedVectorOfNonZeroRankOf<[Index]>;
 def XeGPU_MaskType: FixedVectorOfNonZeroRankOf<[I1]>;
-def XeGPU_ValueType: VectorOfRankAndType<[1,2,3,4,5,6], [XeGPU_ScalarType]>;
-def XeGPU_ValueOrScalarType : AnyTypeOf<[XeGPU_ValueType, XeGPU_ScalarType]>;
-def XeGPU_VectorOrScalarType
+def XeGPU_ValueType: FixedVectorOfNonZeroRankOf<[XeGPU_ScalarType]>;
+def XeGPU_VectorType: VectorOfRankAndType<[1,2,3,4,5,6], [XeGPU_ScalarType]>;
+def XeGPU_VectorOrOffsetVectorType
+    : VectorOfRankAndType<[1,2,3,4,5,6], [XeGPU_ScalarType, Index]>;
+def XeGPU_ConvertLayoutType
     : AnyTypeOf<[VectorOfRankAndType<[1,2,3,4,5,6], [XeGPU_ScalarType, Index]>, XeGPU_ScalarType]>;
 def XeGPU_GatherScatterBaseAddrType
     : AnyTypeOf<[MemRefRankOf<[XeGPU_ScalarType], [1]>, XeGPU_PointerType]>;
@@ -82,7 +84,7 @@ def XeGPU_TensorDesc: XeGPUTypeDef<"TensorDesc", "tensor_desc",
     static-dim-list ::= decimal-literal `x` decimal-literal
     attr-list = (, encoding-attr)? (, layout-attr)?
     enconding-attr = (, memory_space = value)? (, arr_len = value)? (, boundary_check = value)? (, scattered = value)?
-    layout-attr = DistributeLayoutAttr
+    layout-attr = (, layout `<`sg_layout = value, sg_data = value, inst_data = value, lane_layout = value, lane_data = value, order = value`>`)?
     ```
 
     Examples:
@@ -158,8 +160,8 @@ def XeGPU_TensorDesc: XeGPUTypeDef<"TensorDesc", "tensor_desc",
       return llvm::dyn_cast_if_present<T>(getEncoding());
     }
 
-    DistributeLayoutAttr getLayoutAttr() const {
-      return llvm::dyn_cast_if_present<DistributeLayoutAttr>(getLayout());
+    LayoutAttr getLayoutAttr() const {
+      return llvm::dyn_cast_if_present<LayoutAttr>(getLayout());
     }
 
     xegpu::MemorySpace getMemorySpace() const {

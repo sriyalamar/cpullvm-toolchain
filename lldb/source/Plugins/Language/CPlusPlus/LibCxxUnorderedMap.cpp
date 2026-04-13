@@ -20,7 +20,6 @@
 #include "lldb/ValueObject/ValueObjectConstResult.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/ErrorExtras.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -223,7 +222,7 @@ lldb_private::formatters::LibcxxStdUnorderedMapSyntheticFrontEnd::
     return size_sp->GetValueAsUnsigned(0);
 
   if (!is_compressed_pair)
-    return llvm::createStringError("unsupported std::unordered_map layout");
+    return llvm::createStringError("Unsupported std::unordered_map layout.");
 
   ValueObjectSP num_elements_sp = GetFirstValueOfLibCXXCompressedPair(*size_sp);
 
@@ -393,7 +392,8 @@ lldb_private::formatters::LibCxxUnorderedMapIteratorSyntheticFrontEnd::
     return 0;
   if (name == "second")
     return 1;
-  return llvm::createStringErrorV("type has no child named '{0}'", name);
+  return llvm::createStringError("Type has no child named '%s'",
+                                 name.AsCString());
 }
 
 SyntheticChildrenFrontEnd *

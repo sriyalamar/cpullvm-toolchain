@@ -600,14 +600,14 @@ TEST_F(SerializeTest, emitChildNamespaces) {
 
   NamespaceInfo *ParentA = InfoAsNamespace(Infos[1].get());
   NamespaceInfo ExpectedParentA(EmptySID);
-  Reference RA(EmptySID, "A", InfoType::IT_namespace);
-  ExpectedParentA.Children.Namespaces.push_back(RA);
+  ExpectedParentA.Children.Namespaces.emplace_back(EmptySID, "A",
+                                                   InfoType::IT_namespace);
   CheckNamespaceInfo(&ExpectedParentA, ParentA);
 
   NamespaceInfo *ParentB = InfoAsNamespace(Infos[3].get());
   NamespaceInfo ExpectedParentB(EmptySID);
-  Reference RB(EmptySID, "B", InfoType::IT_namespace, "A::B", "A");
-  ExpectedParentB.Children.Namespaces.push_back(RB);
+  ExpectedParentB.Children.Namespaces.emplace_back(
+      EmptySID, "B", InfoType::IT_namespace, "A::B", "A");
   CheckNamespaceInfo(&ExpectedParentB, ParentB);
 }
 

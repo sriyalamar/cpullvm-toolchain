@@ -1146,8 +1146,10 @@ bool CanCUDASymbolBeGlobal(const Symbol &sym) {
           return false;
         }
       }
-      if (details->cudaDataAttr())
+      if (details->cudaDataAttr() &&
+          *details->cudaDataAttr() != common::CUDADataAttr::Unified) {
         return false;
+      }
     }
   }
   return true;

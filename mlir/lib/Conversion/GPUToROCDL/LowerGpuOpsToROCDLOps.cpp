@@ -545,8 +545,6 @@ struct GPUBarrierOpLowering final : ConvertOpToLLVMPattern<gpu::BarrierOp> {
           fenceLDS = true;
           break;
         case gpu::AddressSpace::Private:
-        case gpu::AddressSpace::Constant:
-          // Private is thread-local, constant is read-only; no fencing needed.
           break;
         }
       }

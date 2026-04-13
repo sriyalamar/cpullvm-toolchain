@@ -490,8 +490,9 @@ void ClangDocBitcodeWriter::emitBlock(const FriendInfo &R) {
   emitRecord(R.IsClass, FRIEND_IS_CLASS);
   if (R.Template)
     emitBlock(*R.Template);
-  for (const auto &P : R.Params)
-    emitBlock(P);
+  if (R.Params)
+    for (const auto &P : *R.Params)
+      emitBlock(P);
   if (R.ReturnType)
     emitBlock(*R.ReturnType);
   for (const auto &CI : R.Description)

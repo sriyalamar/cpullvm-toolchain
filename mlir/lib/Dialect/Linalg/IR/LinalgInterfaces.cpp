@@ -227,19 +227,16 @@ linalg::isaTransposeOpInterface(GenericOp op) {
 //===----------------------------------------------------------------------===//
 // Elementwise Single Unary/Binary-OpInterface implementation
 //===----------------------------------------------------------------------===//
-static bool
-isaElemwiseSingleUnaryOrBinaryOpInterface(linalg::GenericOp op, unsigned arity,
-                                          bool allowNonIdentityMaps) {
+static bool isaElemwiseSingleUnaryOrBinaryOpInterface(linalg::GenericOp op,
+                                                      unsigned arity) {
   // Check all loops are parallel.
   if (!op.isAllParallelLoops() || op.getNumLoops() < 1)
     return false;
 
-  // Check there are arity-inputs, 1-output and all are identity-maps (unless
-  // requested otherwise).
+  // Check there are arity-inputs, 1-output and all are identity-maps.
   if (op.getNumDpsInputs() != arity || op.getNumDpsInits() != 1 ||
-      (!allowNonIdentityMaps &&
-       !llvm::all_of(op.getIndexingMapsArray(),
-                     [](AffineMap map) { return map.isIdentity(); })))
+      !llvm::all_of(op.getIndexingMapsArray(),
+                    [](AffineMap map) { return map.isIdentity(); }))
     return false;
 
   // Init should not be referenced for elementwise operations.
@@ -267,21 +264,19 @@ isaElemwiseSingleUnaryOrBinaryOpInterface(linalg::GenericOp op, unsigned arity,
            yieldOp->getOperand(0).getDefiningOp() != oper);
 }
 
-bool linalg::isaElemwiseSingleUnaryOpInterface(linalg::GenericOp op,
-                                               bool allowNonIdentityMaps) {
+bool linalg::isaElemwiseSingleUnaryOpInterface(linalg::GenericOp op) {
   // All basic elemwise checks.
-  if (!isaElemwiseSingleUnaryOrBinaryOpInterface(op, 1, allowNonIdentityMaps))
+  if (!isaElemwiseSingleUnaryOrBinaryOpInterface(op, 1))
     return false;
 
-  // Check input is actually used.
+  // Check input is actully used.
   if (!op.payloadUsesValueFromOperand(op.getDpsInputOperand(0)))
     return false;
   return true;
 }
 
 bool linalg::isaElemwiseSingleBinaryOpInterface(linalg::GenericOp op) {
-  if (!isaElemwiseSingleUnaryOrBinaryOpInterface(
-          op, 2, /*allowNonIdentityMaps=*/false))
+  if (!isaElemwiseSingleUnaryOrBinaryOpInterface(op, 2))
     return false;
 
   // Check both inputs are used (elementwise).

@@ -675,17 +675,10 @@ void CIRGenModule::setCommonAttributes(GlobalDecl gd, mlir::Operation *gv) {
 void CIRGenModule::setNonAliasAttributes(GlobalDecl gd, mlir::Operation *op) {
   setCommonAttributes(gd, op);
 
-  const Decl *d = gd.getDecl();
-  if (d) {
-    if (auto gvi = mlir::dyn_cast<cir::CIRGlobalValueInterface>(op)) {
-      if (const auto *sa = d->getAttr<SectionAttr>())
-        gvi.setSection(builder.getStringAttr(sa->getName()));
-    }
-  }
-
-  assert(!cir::MissingFeatures::opGlobalPragmaClangSection());
   assert(!cir::MissingFeatures::opGlobalUsedOrCompilerUsed());
+  assert(!cir::MissingFeatures::opGlobalSection());
   assert(!cir::MissingFeatures::opFuncCPUAndFeaturesAttributes());
+  assert(!cir::MissingFeatures::opFuncSection());
 
   getTargetCIRGenInfo().setTargetAttributes(gd.getDecl(), op, *this);
 }
@@ -908,7 +901,6 @@ cir::GlobalOp
 CIRGenModule::getOrCreateCIRGlobal(StringRef mangledName, mlir::Type ty,
                                    LangAS langAS, const VarDecl *d,
                                    ForDefinition_t isForDefinition) {
-
   // Lookup the entry, lazily creating it if necessary.
   cir::GlobalOp entry;
   if (mlir::Operation *v = getGlobalValue(mangledName)) {
@@ -919,14 +911,13 @@ CIRGenModule::getOrCreateCIRGlobal(StringRef mangledName, mlir::Type ty,
   }
 
   if (entry) {
-    mlir::ptr::MemorySpaceAttrInterface entryCIRAS = entry.getAddrSpaceAttr();
     assert(!cir::MissingFeatures::opGlobalWeakRef());
 
     assert(!cir::MissingFeatures::setDLLStorageClass());
     assert(!cir::MissingFeatures::openMP());
 
     if (entry.getSymType() == ty &&
-        cir::isMatchingAddressSpace(entryCIRAS, langAS))
+        (cir::isMatchingAddressSpace(entry.getAddrSpaceAttr(), langAS)))
       return entry;
 
     // If there are two attempts to define the same mangled name, issue an
@@ -1011,12 +1002,8 @@ CIRGenModule::getOrCreateCIRGlobal(StringRef mangledName, mlir::Type ty,
       errorNYI(d->getSourceRange(),
                "getOrCreateCIRGlobal: MS static data member inline definition");
 
-    // Emit section information for extern variables.
-    if (d->hasExternalStorage()) {
-      if (const SectionAttr *sa = d->getAttr<SectionAttr>())
-        gv.setSectionAttr(builder.getStringAttr(sa->getName()));
-    }
-    gv.setGlobalVisibility(getGlobalVisibilityAttrFromDecl(d).getValue());
+    assert(!cir::MissingFeatures::opGlobalSection());
+    gv.setGlobalVisibilityAttr(getGlobalVisibilityAttrFromDecl(d));
 
     // Handle XCore specific ABI requirements.
     if (getTriple().getArch() == llvm::Triple::xcore)
@@ -1267,12 +1254,7 @@ void CIRGenModule::emitGlobalVarDefinition(const clang::VarDecl *vd,
                   vd->getType().isConstantStorage(astContext,
                                                   /*ExcludeCtor=*/true,
                                                   /*ExcludeDtor=*/true)));
-  // If it is in a read-only section, mark it 'constant'.
-  if (const SectionAttr *sa = vd->getAttr<SectionAttr>()) {
-    const ASTContext::SectionInfo &si = astContext.SectionInfos[sa->getName()];
-    if ((si.SectionFlags & ASTContext::PSF_Write) == 0)
-      gv.setConstant(true);
-  }
+  assert(!cir::MissingFeatures::opGlobalSection());
 
   // Set CIR linkage and DLL storage class.
   gv.setLinkage(linkage);
@@ -1735,13 +1717,9 @@ void CIRGenModule::replaceUsesOfNonProtoTypeWithRealFunction(
       // Replace type
       getGlobalOp.getAddr().setType(
           cir::PointerType::get(newFn.getFunctionType()));
-    } else if (mlir::isa<cir::GlobalOp>(use.getUser())) {
-      // Function addresses in global initializers use GlobalViewAttrs typed to
-      // the initializer context (e.g. struct field type), not the FuncOp type,
-      // so no update is required when the no-proto FuncOp is replaced.
     } else {
-      llvm_unreachable(
-          "replaceUsesOfNonProtoTypeWithRealFunction: unexpected use type");
+      errorNYI(use.getUser()->getLoc(),
+               "replaceUsesOfNonProtoTypeWithRealFunction: unexpected use");
     }
   }
 }
@@ -1974,18 +1952,16 @@ void CIRGenModule::emitTopLevelDecl(Decl *decl) {
       emitGlobal(fd);
     break;
   }
-  case Decl::Export:
-    emitDeclContext(cast<ExportDecl>(decl));
-    break;
 
   case Decl::Var:
   case Decl::Decomposition:
   case Decl::VarTemplateSpecialization: {
-    emitGlobal(cast<VarDecl>(decl));
-    if (auto *decomp = dyn_cast<DecompositionDecl>(decl))
-      for (auto *binding : decomp->flat_bindings())
-        if (auto *holdingVar = binding->getHoldingVar())
-          emitGlobal(holdingVar);
+    auto *vd = cast<VarDecl>(decl);
+    if (isa<DecompositionDecl>(decl)) {
+      errorNYI(decl->getSourceRange(), "global variable decompositions");
+      break;
+    }
+    emitGlobal(vd);
     break;
   }
   case Decl::OpenACCRoutine:
@@ -2611,7 +2587,7 @@ void CIRGenModule::setFunctionAttributes(GlobalDecl globalDecl,
   // recompute it here. This is a minimal fix for now.
   if (!isLocalLinkage(getFunctionLinkage(globalDecl))) {
     const Decl *decl = globalDecl.getDecl();
-    func.setGlobalVisibility(getGlobalVisibilityAttrFromDecl(decl).getValue());
+    func.setGlobalVisibilityAttr(getGlobalVisibilityAttrFromDecl(decl));
   }
 
   // If we plan on emitting this inline builtin, we can't treat it as a builtin.

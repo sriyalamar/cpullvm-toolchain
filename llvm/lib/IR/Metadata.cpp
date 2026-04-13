@@ -1558,6 +1558,8 @@ unsigned Value::getMetadataIndex() const {
 }
 
 MDNode *Value::getMetadata(StringRef Kind) const {
+  if (!hasMetadata())
+    return nullptr;
   unsigned KindID = getContext().getMDKindID(Kind);
   return getMetadataImpl(KindID);
 }
@@ -1574,10 +1576,9 @@ MDNode *Value::getMetadataImpl(unsigned KindID) const {
   return nullptr;
 }
 
-void GlobalObject::getMetadata(unsigned KindID,
-                               SmallVectorImpl<MDNode *> &MDs) const {
+void Value::getMetadata(unsigned KindID, SmallVectorImpl<MDNode *> &MDs) const {
   const LLVMContext &Ctx = getContext();
-  unsigned Idx = MetadataIndex;
+  unsigned Idx = getMetadataIndex();
   while (Idx) {
     const MDAttachment &A = Ctx.pImpl->Metadatas[Idx];
     if (A.MDKind == KindID)
@@ -1588,8 +1589,7 @@ void GlobalObject::getMetadata(unsigned KindID,
   std::reverse(MDs.begin(), MDs.end());
 }
 
-void GlobalObject::getMetadata(StringRef Kind,
-                               SmallVectorImpl<MDNode *> &MDs) const {
+void Value::getMetadata(StringRef Kind, SmallVectorImpl<MDNode *> &MDs) const {
   getMetadata(getContext().getMDKindID(Kind), MDs);
 }
 
@@ -1613,19 +1613,20 @@ void Value::getAllMetadata(
 void Value::setMetadata(unsigned KindID, MDNode *Node) {
   assert(isa<Instruction>(this) || isa<GlobalObject>(this));
 
-  if (getMetadataIndex() != 0)
-    eraseMetadata(KindID);
+  eraseMetadata(KindID);
   if (Node)
     addMetadata(KindID, *Node);
 }
 
 void Value::setMetadata(StringRef Kind, MDNode *Node) {
-  if (!Node && getMetadataIndex() == 0)
+  if (!Node && !HasMetadata)
     return;
   setMetadata(getContext().getMDKindID(Kind), Node);
 }
 
 void Value::addMetadata(unsigned KindID, MDNode &MD) {
+  if (!HasMetadata)
+    HasMetadata = true;
   const LLVMContext &Ctx = getContext();
   unsigned &Idx = getMetadataIndex();
   unsigned NewIdx = Ctx.pImpl->MetadataRecycleHead;
@@ -1676,6 +1677,8 @@ void Value::eraseMetadataIf(function_ref<bool(unsigned, MDNode *)> Pred) {
       Idx = &A.Next;
     }
   }
+  if (getMetadataIndex() == 0)
+    HasMetadata = false;
 }
 
 void Value::clearMetadata() {
@@ -1683,7 +1686,7 @@ void Value::clearMetadata() {
 }
 
 void Instruction::setMetadata(StringRef Kind, MDNode *Node) {
-  if (!Node && MetadataIndex == 0)
+  if (!Node && !hasMetadata())
     return;
   setMetadata(getContext().getMDKindID(Kind), Node);
 }
@@ -1693,7 +1696,7 @@ MDNode *Instruction::getMetadataImpl(StringRef Kind) const {
   unsigned KindID = Ctx.getMDKindID(Kind);
   if (KindID == LLVMContext::MD_dbg)
     return DbgLoc.getAsMDNode();
-  return Value::getMetadataImpl(KindID);
+  return Value::getMetadata(KindID);
 }
 
 void Instruction::eraseMetadataIf(function_ref<bool(unsigned, MDNode *)> Pred) {
@@ -1704,7 +1707,7 @@ void Instruction::eraseMetadataIf(function_ref<bool(unsigned, MDNode *)> Pred) {
 }
 
 void Instruction::dropUnknownNonDebugMetadata(ArrayRef<unsigned> KnownIDs) {
-  if (!hasMetadataOtherThanDebugLoc())
+  if (!Value::hasMetadata())
     return; // Nothing to remove!
 
   SmallSet<unsigned, 32> KnownSet(llvm::from_range, KnownIDs);
@@ -1821,7 +1824,9 @@ void Instruction::addAnnotationMetadata(StringRef Name) {
 
 AAMDNodes Instruction::getAAMetadata() const {
   AAMDNodes Result;
-  if (hasMetadataOtherThanDebugLoc()) {
+  // Not using Instruction::hasMetadata() because we're not interested in
+  // DebugInfoMetadata.
+  if (Value::hasMetadata()) {
     unsigned Idx = MetadataIndex;
     const auto &Metadatas = getContext().pImpl->Metadatas;
     while (Idx) {
