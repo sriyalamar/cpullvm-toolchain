@@ -89,9 +89,9 @@ void InlineFunctionInfo::DumpStopContext(Stream *s) const {
   //    s->Indent("[inlined] ");
   s->Indent();
   if (m_mangled)
-    s->PutCString(m_mangled.GetName());
+    s->PutCString(m_mangled.GetName().AsCString());
   else
-    s->PutCString(m_name);
+    s->PutCString(m_name.AsCString());
 }
 
 ConstString InlineFunctionInfo::GetName() const {

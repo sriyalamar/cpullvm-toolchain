@@ -67,8 +67,8 @@ class SPIRVGlobalRegistry : public SPIRVIRMapping {
   // if a function returns a pointer, this is to map it into TypedPointerType
   DenseMap<const Function *, TypedPointerType *> FunResPointerTypes;
 
-  // Current target's datalayout.
-  DataLayout DL;
+  // Number of bits pointers and size_t integers require.
+  const unsigned PointerSize;
 
   // Holds the maximum ID we have in the module.
   unsigned Bound;
@@ -112,7 +112,7 @@ class SPIRVGlobalRegistry : public SPIRVIRMapping {
       std::function<MachineInstr *(MachineIRBuilder &)> Op);
 
 public:
-  SPIRVGlobalRegistry(DataLayout DL);
+  SPIRVGlobalRegistry(unsigned PointerSize);
 
   MachineFunction *CurMF;
 
@@ -418,9 +418,7 @@ public:
   getPointerStorageClass(SPIRVTypeInst Type) const;
 
   // Return the number of bits SPIR-V pointers and size_t variables require.
-  unsigned getPointerSize() const {
-    return DL.getPointerSizeInBits(/* AS = */ 0);
-  }
+  unsigned getPointerSize() const { return PointerSize; }
 
   // Returns true if two types are defined and are compatible in a sense of
   // OpBitcast instruction

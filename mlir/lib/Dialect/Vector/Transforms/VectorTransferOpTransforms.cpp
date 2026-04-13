@@ -22,7 +22,6 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/Dominance.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "llvm/ADT/STLExtras.h"
@@ -430,33 +429,30 @@ static VectorType trimNonScalableUnitDims(VectorType oldType) {
   return VectorType::get(newShape, oldType.getElementType(), newScalableDims);
 }
 
-static bool isUnitDimMask(Value maskDimSize) {
-  return matchPattern(maskDimSize, m_One());
-}
-static bool isUnitDimMask(int64_t maskDimSize) { return maskDimSize == 1; }
-
-/// Rewrites a mask op to drop non-scalable unit dimensions.
-/// Supports vector.create_mask and vector.constant_mask.
-template <typename MaskOp>
-static FailureOr<Value> maskDropNonScalableUnitDims(PatternRewriter &rewriter,
-                                                    Location loc, MaskOp op) {
+// Rewrites vector.create_mask 'op' to drop non-scalable one dimensions.
+static FailureOr<Value>
+createMaskDropNonScalableUnitDims(PatternRewriter &rewriter, Location loc,
+                                  vector::CreateMaskOp op) {
   auto type = op.getType();
   VectorType reducedType = trimNonScalableUnitDims(type);
   if (reducedType.getRank() == type.getRank())
     return failure();
 
-  using ElemType = std::decay_t<decltype(*op.getMaskDimSizes().begin())>;
-  SmallVector<ElemType> reduced;
-  for (auto [dim, dimIsScalable, elem] : llvm::zip_equal(
-           type.getShape(), type.getScalableDims(), op.getMaskDimSizes())) {
+  SmallVector<Value> reducedOperands;
+  for (auto [dim, dimIsScalable, operand] : llvm::zip_equal(
+           type.getShape(), type.getScalableDims(), op.getOperands())) {
     if (dim == 1 && !dimIsScalable) {
-      if (!isUnitDimMask(elem))
+      // If the mask for the unit dim is not a constant of 1, do nothing.
+      auto constant = operand.getDefiningOp<arith::ConstantIndexOp>();
+      if (!constant || (constant.value() != 1))
         return failure();
       continue;
     }
-    reduced.push_back(elem);
+    reducedOperands.push_back(operand);
   }
-  return MaskOp::create(rewriter, loc, reducedType, reduced).getResult();
+  return vector::CreateMaskOp::create(rewriter, loc, reducedType,
+                                      reducedOperands)
+      .getResult();
 }
 
 namespace {
@@ -526,23 +522,21 @@ class TransferReadDropUnitDimsPattern
     Value maskOp = transferReadOp.getMask();
     if (maskOp) {
       LDBG() << "  -> Processing mask operation";
-      FailureOr<Value> rankReducedMaskOp = failure();
-      if (auto createMaskOp = maskOp.getDefiningOp<vector::CreateMaskOp>())
-        rankReducedMaskOp =
-            maskDropNonScalableUnitDims(rewriter, loc, createMaskOp);
-      else if (auto constantMaskOp =
-                   maskOp.getDefiningOp<vector::ConstantMaskOp>())
-        rankReducedMaskOp =
-            maskDropNonScalableUnitDims(rewriter, loc, constantMaskOp);
-
-      if (failed(rankReducedMaskOp)) {
-        LDBG() << "  -> Failed to reduce mask dimensions";
+      auto createMaskOp = maskOp.getDefiningOp<vector::CreateMaskOp>();
+      if (!createMaskOp) {
+        LDBG()
+            << "  -> Unsupported mask op, only 'vector.create_mask' supported";
         return rewriter.notifyMatchFailure(
-            transferReadOp,
-            "unsupported mask op, only 'vector.create_mask' and "
-            "'vector.constant_mask' are currently supported");
+            transferReadOp, "unsupported mask op, only 'vector.create_mask' is "
+                            "currently supported");
       }
-      maskOp = *rankReducedMaskOp;
+      FailureOr<Value> rankReducedCreateMask =
+          createMaskDropNonScalableUnitDims(rewriter, loc, createMaskOp);
+      if (failed(rankReducedCreateMask)) {
+        LDBG() << "  -> Failed to reduce mask dimensions";
+        return failure();
+      }
+      maskOp = *rankReducedCreateMask;
       LDBG() << "  -> Successfully reduced mask dimensions";
     }
 
@@ -642,23 +636,22 @@ class TransferWriteDropUnitDimsPattern
     Value maskOp = transferWriteOp.getMask();
     if (maskOp) {
       LDBG() << "  -> Processing mask operation";
-      FailureOr<Value> rankReducedMask = failure();
-      if (auto createMaskOp = maskOp.getDefiningOp<vector::CreateMaskOp>())
-        rankReducedMask =
-            maskDropNonScalableUnitDims(rewriter, loc, createMaskOp);
-      else if (auto constantMaskOp =
-                   maskOp.getDefiningOp<vector::ConstantMaskOp>())
-        rankReducedMask =
-            maskDropNonScalableUnitDims(rewriter, loc, constantMaskOp);
-
-      if (failed(rankReducedMask)) {
-        LDBG() << "  -> Failed to reduce mask dimensions";
+      auto createMaskOp = maskOp.getDefiningOp<vector::CreateMaskOp>();
+      if (!createMaskOp) {
+        LDBG()
+            << "  -> Unsupported mask op, only 'vector.create_mask' supported";
         return rewriter.notifyMatchFailure(
             transferWriteOp,
-            "unsupported mask op, only 'vector.create_mask' and "
-            "'vector.constant_mask' are currently supported");
+            "unsupported mask op, only 'vector.create_mask' is "
+            "currently supported");
       }
-      maskOp = *rankReducedMask;
+      FailureOr<Value> rankReducedCreateMask =
+          createMaskDropNonScalableUnitDims(rewriter, loc, createMaskOp);
+      if (failed(rankReducedCreateMask)) {
+        LDBG() << "  -> Failed to reduce mask dimensions";
+        return failure();
+      }
+      maskOp = *rankReducedCreateMask;
       LDBG() << "  -> Successfully reduced mask dimensions";
     }
     LDBG() << "  -> Creating rank-reduced subview and new transfer_write";

@@ -252,7 +252,6 @@ public:
   NODE(parser, ComputedGotoStmt)
   NODE(parser, ConcurrentControl)
   NODE(parser, ConcurrentHeader)
-  NODE(parser, ConditionalExpr)
   NODE(parser, ConnectSpec)
   NODE(ConnectSpec, CharExpr)
   NODE_ENUM(ConnectSpec::CharExpr, Kind)

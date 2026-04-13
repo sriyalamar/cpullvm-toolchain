@@ -199,10 +199,9 @@ TEST_F(JSONGeneratorTest, emitNamespaceJSON) {
   I.Path = "path/to/A";
   I.Namespace.emplace_back(EmptySID, "A", InfoType::IT_namespace);
 
-  Reference NewNamespace(EmptySID, "ChildNamespace", InfoType::IT_namespace,
-                         "path::to::A::Namespace::ChildNamespace",
-                         "path/to/A/Namespace");
-  I.Children.Namespaces.push_back(NewNamespace);
+  I.Children.Namespaces.emplace_back(
+      EmptySID, "ChildNamespace", InfoType::IT_namespace,
+      "path::to::A::Namespace::ChildNamespace", "path/to/A/Namespace");
   I.Children.Records.emplace_back(EmptySID, "ChildStruct", InfoType::IT_record,
                                   "path::to::A::Namespace::ChildStruct",
                                   "path/to/A/Namespace");

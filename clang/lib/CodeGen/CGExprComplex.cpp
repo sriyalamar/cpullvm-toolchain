@@ -507,12 +507,8 @@ ComplexPairTy ComplexExprEmitter::EmitComplexToComplexCast(ComplexPairTy Val,
                                                            QualType DestType,
                                                            SourceLocation Loc) {
   // Get the src/dest element type.
-  SrcType = SrcType.getAtomicUnqualifiedType()
-                ->castAs<ComplexType>()
-                ->getElementType();
-  DestType = DestType.getAtomicUnqualifiedType()
-                 ->castAs<ComplexType>()
-                 ->getElementType();
+  SrcType = SrcType->castAs<ComplexType>()->getElementType();
+  DestType = DestType->castAs<ComplexType>()->getElementType();
 
   // C99 6.3.1.6: When a value of complex type is converted to another
   // complex type, both the real and imaginary parts follow the conversion
@@ -538,7 +534,6 @@ ComplexPairTy ComplexExprEmitter::EmitScalarToComplexCast(llvm::Value *Val,
 
 ComplexPairTy ComplexExprEmitter::EmitCast(CastKind CK, Expr *Op,
                                            QualType DestTy) {
-  DestTy = DestTy.getAtomicUnqualifiedType();
   switch (CK) {
   case CK_Dependent:
     llvm_unreachable("dependent cast kind in IR gen!");
@@ -1220,7 +1215,9 @@ LValue ComplexExprEmitter::EmitCompoundAssignLValue(
     ComplexPairTy (ComplexExprEmitter::*Func)(const BinOpInfo &), RValue &Val) {
   TestAndClearIgnoreReal();
   TestAndClearIgnoreImag();
-  QualType LHSTy = E->getLHS()->getType().getAtomicUnqualifiedType();
+  QualType LHSTy = E->getLHS()->getType();
+  if (const AtomicType *AT = LHSTy->getAs<AtomicType>())
+    LHSTy = AT->getValueType();
 
   BinOpInfo OpInfo;
   OpInfo.FPFeatures = E->getFPFeaturesInEffect(CGF.getLangOpts());

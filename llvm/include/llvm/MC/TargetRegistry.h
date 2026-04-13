@@ -21,7 +21,6 @@
 #include "llvm-c/DisassemblerTypes.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Compiler.h"
@@ -240,7 +239,7 @@ public:
                                   const MCInstrInfo &MCII);
 
   using MCLFIRewriterCtorTy =
-      MCLFIRewriter *(*)(MCContext & Ctx,
+      MCLFIRewriter *(*)(MCStreamer & S,
                          std::unique_ptr<MCRegisterInfo> &&RegInfo,
                          std::unique_ptr<MCInstrInfo> &&InstInfo);
 
@@ -411,10 +410,7 @@ public:
                              const MCTargetOptions &Options) const {
     if (!MCAsmInfoCtorFn)
       return nullptr;
-    auto *MAI = MCAsmInfoCtorFn(MRI, TheTriple, Options);
-    if (MAI)
-      MAI->setTargetOptions(Options);
-    return MAI;
+    return MCAsmInfoCtorFn(MRI, TheTriple, Options);
   }
 
   /// Create a MCObjectFileInfo implementation for the specified target
@@ -580,12 +576,11 @@ public:
     return nullptr;
   }
 
-  MCLFIRewriter *
-  createMCLFIRewriter(MCContext &Ctx, std::unique_ptr<MCRegisterInfo> &&RegInfo,
-                      std::unique_ptr<MCInstrInfo> &&InstInfo) const {
+  void createMCLFIRewriter(MCStreamer &S,
+                           std::unique_ptr<MCRegisterInfo> &&RegInfo,
+                           std::unique_ptr<MCInstrInfo> &&InstInfo) const {
     if (MCLFIRewriterCtorFn)
-      return MCLFIRewriterCtorFn(Ctx, std::move(RegInfo), std::move(InstInfo));
-    return nullptr;
+      MCLFIRewriterCtorFn(S, std::move(RegInfo), std::move(InstInfo));
   }
 
   /// createMCRelocationInfo - Create a target specific MCRelocationInfo.

@@ -607,9 +607,6 @@ bool CompilerInstanceWithContext::computeDependencies(
   if (!ModResult)
     return false;
 
-  if (CI.getDiagnostics().hasErrorOccurred())
-    return false;
-
   MDC->applyDiscoveredDependencies(ModuleInvocation);
 
   if (!Controller.finalize(CI, ModuleInvocation))

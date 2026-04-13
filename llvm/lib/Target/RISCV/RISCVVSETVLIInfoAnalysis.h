@@ -268,11 +268,7 @@ public:
     }
   }
 
-  bool hasSEWLMULRatioOnly() const {
-    assert(isValid() && !isUnknown() &&
-           "Can't use VTYPE for uninitialized or unknown");
-    return SEWLMULRatioOnly;
-  }
+  bool hasSEWLMULRatioOnly() const { return SEWLMULRatioOnly; }
 
   unsigned getSEW() const {
     assert(isValid() && !isUnknown() && !hasSEWLMULRatioOnly() &&

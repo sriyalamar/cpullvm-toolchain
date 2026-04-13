@@ -10,7 +10,8 @@ target datalayout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"
 @c = global [6 x i8] zeroinitializer, align 1
 @b = internal global %struct.anon zeroinitializer, align 1
 
-define void @_Z1dv() {
+; Function Attrs: noreturn nounwind
+define void @_Z1dv() #0 {
 ; CHECK-LABEL: @_Z1dv(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[CALL:%.*]] = tail call ptr @"_ZN3$_01aEv"(ptr nonnull @b)

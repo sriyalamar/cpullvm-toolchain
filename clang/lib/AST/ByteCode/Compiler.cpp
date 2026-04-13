@@ -4993,14 +4993,15 @@ template <class Emitter>
 unsigned Compiler<Emitter>::allocateLocalPrimitive(DeclTy &&Src, PrimType Ty,
                                                    bool IsConst,
                                                    bool IsVolatile,
-                                                   ScopeKind SC) {
+                                                   ScopeKind SC,
+                                                   bool IsConstexprUnknown) {
   // FIXME: There are cases where Src.is<Expr*>() is wrong, e.g.
   //   (int){12} in C. Consider using Expr::isTemporaryObject() instead
   //   or isa<MaterializeTemporaryExpr>().
   Descriptor *D = P.createDescriptor(Src, Ty, nullptr, Descriptor::InlineDescMD,
                                      IsConst, isa<const Expr *>(Src),
                                      /*IsMutable=*/false, IsVolatile);
-  D->IsConstexprUnknown = this->VariablesAreConstexprUnknown;
+  D->IsConstexprUnknown = IsConstexprUnknown;
   Scope::Local Local = this->createLocal(D);
   if (auto *VD = dyn_cast_if_present<ValueDecl>(Src.dyn_cast<const Decl *>()))
     Locals.insert({VD, Local});
@@ -5010,7 +5011,8 @@ unsigned Compiler<Emitter>::allocateLocalPrimitive(DeclTy &&Src, PrimType Ty,
 
 template <class Emitter>
 UnsignedOrNone Compiler<Emitter>::allocateLocal(DeclTy &&Src, QualType Ty,
-                                                ScopeKind SC) {
+                                                ScopeKind SC,
+                                                bool IsConstexprUnknown) {
   const ValueDecl *Key = nullptr;
   const Expr *Init = nullptr;
   bool IsTemporary = false;
@@ -5032,7 +5034,7 @@ UnsignedOrNone Compiler<Emitter>::allocateLocal(DeclTy &&Src, QualType Ty,
       Init);
   if (!D)
     return std::nullopt;
-  D->IsConstexprUnknown = this->VariablesAreConstexprUnknown;
+  D->IsConstexprUnknown = IsConstexprUnknown;
 
   Scope::Local Local = this->createLocal(D);
   if (Key)
@@ -5135,9 +5137,11 @@ bool Compiler<Emitter>::visitExpr(const Expr *E, bool DestroyToplevelScope) {
 }
 
 template <class Emitter>
-VarCreationState Compiler<Emitter>::visitDecl(const VarDecl *VD) {
+VarCreationState Compiler<Emitter>::visitDecl(const VarDecl *VD,
+                                              bool IsConstexprUnknown) {
 
-  auto R = this->visitVarDecl(VD, VD->getInit(), /*Toplevel=*/true);
+  auto R = this->visitVarDecl(VD, VD->getInit(), /*Toplevel=*/true,
+                              IsConstexprUnknown);
 
   if (R.notCreated())
     return R;
@@ -5221,9 +5225,9 @@ bool Compiler<Emitter>::visitDeclAndReturn(const VarDecl *VD, const Expr *Init,
 }
 
 template <class Emitter>
-VarCreationState Compiler<Emitter>::visitVarDecl(const VarDecl *VD,
-                                                 const Expr *Init,
-                                                 bool Toplevel) {
+VarCreationState
+Compiler<Emitter>::visitVarDecl(const VarDecl *VD, const Expr *Init,
+                                bool Toplevel, bool IsConstexprUnknown) {
   // We don't know what to do with these, so just return false.
   if (VD->getType().isNull())
     return false;
@@ -5286,7 +5290,8 @@ VarCreationState Compiler<Emitter>::visitVarDecl(const VarDecl *VD,
   if (VarT) {
     unsigned Offset = this->allocateLocalPrimitive(
         VD, *VarT, VD->getType().isConstQualified(),
-        VD->getType().isVolatileQualified(), ScopeKind::Block);
+        VD->getType().isVolatileQualified(), ScopeKind::Block,
+        IsConstexprUnknown);
 
     if (!Init || Init->getType()->isVoidType())
       return true;
@@ -5304,8 +5309,8 @@ VarCreationState Compiler<Emitter>::visitVarDecl(const VarDecl *VD,
     return this->emitSetLocal(*VarT, Offset, VD);
   }
   // Local composite variables.
-  if (UnsignedOrNone Offset =
-          this->allocateLocal(VD, VD->getType(), ScopeKind::Block)) {
+  if (UnsignedOrNone Offset = this->allocateLocal(
+          VD, VD->getType(), ScopeKind::Block, IsConstexprUnknown)) {
     if (!Init)
       return true;
 
@@ -7491,10 +7496,8 @@ bool Compiler<Emitter>::visitDeclRef(const ValueDecl *D, const Expr *E) {
   // Local variables.
   if (auto It = Locals.find(D); It != Locals.end()) {
     const unsigned Offset = It->second.Offset;
-    if (IsReference) {
-      assert(classifyPrim(E) == PT_Ptr);
-      return this->emitGetRefLocal(Offset, E);
-    }
+    if (IsReference)
+      return this->emitGetLocal(classifyPrim(E), Offset, E);
     return this->emitGetPtrLocal(Offset, E);
   }
   // Global variables.
@@ -7509,13 +7512,10 @@ bool Compiler<Emitter>::visitDeclRef(const ValueDecl *D, const Expr *E) {
   }
 
   // In case we need to re-visit a declaration.
-  auto revisit = [&](const VarDecl *VD,
-                     bool IsConstexprUnknown = true) -> bool {
-    llvm::SaveAndRestore CURS(this->VariablesAreConstexprUnknown,
-                              IsConstexprUnknown);
+  auto revisit = [&](const VarDecl *VD) -> bool {
     if (!this->emitPushCC(VD->hasConstantInitialization(), E))
       return false;
-    auto VarState = this->visitDecl(VD);
+    auto VarState = this->visitDecl(VD, /*IsConstexprUnknown=*/true);
 
     if (!this->emitPopCC(E))
       return false;
@@ -7563,7 +7563,7 @@ bool Compiler<Emitter>::visitDeclRef(const ValueDecl *D, const Expr *E) {
   if (!Ctx.getLangOpts().CPlusPlus) {
     if (VD->getAnyInitializer() && DeclType.isConstant(Ctx.getASTContext()) &&
         !VD->isWeak())
-      return revisit(VD, /*IsConstexprUnknown=*/false);
+      return revisit(VD);
     return this->emitDummyPtr(D, E);
   }
 
@@ -7597,14 +7597,11 @@ bool Compiler<Emitter>::visitDeclRef(const ValueDecl *D, const Expr *E) {
   if (VD->isLocalVarDecl() && typeShouldBeVisited(DeclType) && VD->getInit() &&
       !VD->getInit()->isValueDependent()) {
     if (VD->evaluateValue()) {
-      bool IsConstexprUnknown = !DeclType.isConstant(Ctx.getASTContext()) &&
-                                !DeclType->isReferenceType();
       // Revisit the variable declaration, but make sure it's associated with a
       // different evaluation, so e.g. mutable reads don't work on it.
       EvalIDScope _(Ctx);
-      return revisit(VD, IsConstexprUnknown);
-    } else if (Ctx.getLangOpts().CPlusPlus23 && IsReference)
-      return revisit(VD, /*IsConstexprUnknown=*/true);
+      return revisit(VD);
+    }
 
     if (IsReference)
       return this->emitInvalidDeclRef(cast<DeclRefExpr>(E),

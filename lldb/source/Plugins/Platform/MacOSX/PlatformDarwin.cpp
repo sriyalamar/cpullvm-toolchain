@@ -50,7 +50,6 @@
 #include "llvm/Support/VersionTuple.h"
 
 #if defined(__APPLE__)
-#include "lldb/Host/macosx/HostInfoMacOSX.h"
 #include <TargetConditionals.h>
 #endif
 
@@ -197,8 +196,7 @@ PlatformDarwin::PutFile(const lldb_private::FileSpec &source,
   return PlatformPOSIX::PutFile(source, destination, uid, gid);
 }
 
-llvm::SmallDenseMap<FileSpec, LoadScriptFromSymFile>
-PlatformDarwin::LocateExecutableScriptingResourcesFromDSYM(
+FileSpecList PlatformDarwin::LocateExecutableScriptingResourcesFromDSYM(
     Stream &feedback_stream, FileSpec module_spec, const Target &target,
     const FileSpec &symfile_spec) {
 
@@ -206,7 +204,7 @@ PlatformDarwin::LocateExecutableScriptingResourcesFromDSYM(
          "Trying to locate scripting resources but no ScriptInterpreter is "
          "available.");
 
-  llvm::SmallDenseMap<FileSpec, LoadScriptFromSymFile> file_specs;
+  FileSpecList file_list;
   while (module_spec.GetFilename()) {
     ScriptInterpreter::SanitizedScriptingModuleName sanitized_name =
         target.GetDebugger()
@@ -236,9 +234,7 @@ PlatformDarwin::LocateExecutableScriptingResourcesFromDSYM(
                                          orig_script_fspec, script_fspec);
 
     if (FileSystem::Instance().Exists(script_fspec)) {
-      LoadScriptFromSymFile load_style =
-          Platform::GetScriptLoadStyleForModule(script_fspec, target);
-      file_specs.try_emplace(std::move(script_fspec), load_style);
+      file_list.Append(script_fspec);
       break;
     }
 
@@ -252,19 +248,17 @@ PlatformDarwin::LocateExecutableScriptingResourcesFromDSYM(
     module_spec.SetFilename(filename_no_extension);
   }
 
-  return file_specs;
+  return file_list;
 }
 
-llvm::SmallDenseMap<FileSpec, LoadScriptFromSymFile>
-PlatformDarwin::LocateExecutableScriptingResourcesForPlatform(
+FileSpecList PlatformDarwin::LocateExecutableScriptingResourcesForPlatform(
     Target *target, Module &module, Stream &feedback_stream) {
-  llvm::SmallDenseMap<FileSpec, LoadScriptFromSymFile> empty;
   if (!target)
-    return empty;
+    return {};
 
   // For now only Python scripts supported for auto-loading.
   if (target->GetDebugger().GetScriptLanguage() != eScriptLanguagePython)
-    return empty;
+    return {};
 
   // NB some extensions might be meaningful and should not be stripped -
   // "this.binary.file"
@@ -276,15 +270,15 @@ PlatformDarwin::LocateExecutableScriptingResourcesForPlatform(
   const FileSpec &module_spec = module.GetFileSpec();
 
   if (!module_spec)
-    return empty;
+    return {};
 
   SymbolFile *symfile = module.GetSymbolFile();
   if (!symfile)
-    return empty;
+    return {};
 
   ObjectFile *objfile = symfile->GetObjectFile();
   if (!objfile)
-    return empty;
+    return {};
 
   const FileSpec &symfile_spec = objfile->GetFileSpec();
   if (symfile_spec &&
@@ -294,41 +288,7 @@ PlatformDarwin::LocateExecutableScriptingResourcesForPlatform(
     return LocateExecutableScriptingResourcesFromDSYM(
         feedback_stream, module_spec, *target, symfile_spec);
 
-  return empty;
-}
-
-bool PlatformDarwin::IsSymbolFileTrusted(Module &module) {
-#if defined(__APPLE__)
-  SymbolFile *symfile = module.GetSymbolFile();
-  if (!symfile)
-    return false;
-
-  ObjectFile *objfile = symfile->GetObjectFile();
-  if (!objfile)
-    return false;
-
-  std::string symfile_path = objfile->GetFileSpec().GetPath();
-  llvm::StringRef path_ref(symfile_path);
-
-  // Find the .dSYM bundle root from the symfile path, which is typically
-  // .dSYM/Contents/Resources/DWARF/<name>.
-  auto pos = path_ref.find(".dSYM/");
-  if (pos == llvm::StringRef::npos)
-    return false;
-
-  FileSpec bundle_spec(path_ref.substr(0, pos + 5));
-
-  if (HostInfoMacOSX::IsBundleCodeSignTrusted(bundle_spec)) {
-    LLDB_LOG(GetLog(LLDBLog::Modules),
-             "dSYM bundle '{0}' has valid trusted code signature",
-             bundle_spec.GetPath());
-    return true;
-  }
-
-  return false;
-#else
-  return false;
-#endif
+  return {};
 }
 
 Status PlatformDarwin::ResolveSymbolFile(Target &target,
@@ -1108,11 +1068,11 @@ ResolveSDKPathFromDebugInfo(lldb_private::Target *target) {
 
   ModuleSP exe_module_sp = target->GetExecutableModule();
   if (!exe_module_sp)
-    return llvm::createStringError("failed to get module from target");
+    return llvm::createStringError("Failed to get module from target");
 
   SymbolFile *sym_file = exe_module_sp->GetSymbolFile();
   if (!sym_file)
-    return llvm::createStringError("failed to get symbol file from executable");
+    return llvm::createStringError("Failed to get symbol file from executable");
 
   if (sym_file->GetNumCompileUnits() == 0)
     return llvm::createStringError(

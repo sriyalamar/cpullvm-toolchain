@@ -351,10 +351,8 @@ Example usage for a project using a compile commands database:
         DiagnosticsEngine::Error, "error reading bitcode: %0");
     unsigned DiagIDBitcodeMerging = Diags.getCustomDiagID(
         DiagnosticsEngine::Error, "error merging bitcode: %0");
-    // Note: we use per-thread arenas, so Pool must outlive the last use of this
-    // memory in the generators.
+    // ExecutorConcurrency is a flag exposed by AllTUsExecution.h
     llvm::DefaultThreadPool Pool(
-        // ExecutorConcurrency is a flag exposed by AllTUsExecution.h
         llvm::hardware_concurrency(ExecutorConcurrency));
     {
       llvm::TimeTraceScope TS("Reduce");

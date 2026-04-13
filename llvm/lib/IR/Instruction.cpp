@@ -74,13 +74,9 @@ Instruction::~Instruction() {
   if (isUsedByMetadata())
     ValueAsMetadata::handleRAUW(this, PoisonValue::get(getType()));
 
-  // Remove associated metadata from context.
-  if (hasMetadata()) {
-    // Explicitly remove DIAssignID metadata to clear up ID -> Instruction(s)
-    // mapping in LLVMContext.
-    updateDIAssignIDMapping(nullptr);
-    clearMetadata();
-  }
+  // Explicitly remove DIAssignID metadata to clear up ID -> Instruction(s)
+  // mapping in LLVMContext.
+  setMetadata(LLVMContext::MD_DIAssignID, nullptr);
 }
 
 const Module *Instruction::getModule() const {

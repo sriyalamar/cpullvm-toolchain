@@ -1383,15 +1383,8 @@ ConstantLValueEmitter::tryEmitBase(const APValue::LValueBase &base) {
       cir::FuncOp fop = cgm.getAddrOfFunction(fd);
       CIRGenBuilderTy &builder = cgm.getBuilder();
       mlir::MLIRContext *mlirContext = builder.getContext();
-      // Use the destination pointer type (e.g. struct field type), not
-      // fop.getFunctionType(), so initializers stay valid when a no-prototype
-      // FuncOp is later replaced by a prototyped definition with the same
-      // symbol. CIR allows the view type to differ from the symbol's type.
-      mlir::Type ptrTy = cgm.getTypes().convertTypeForMem(destType);
-      assert(mlir::isa<cir::PointerType>(ptrTy) &&
-             "function address in constant must be a pointer");
       return cir::GlobalViewAttr::get(
-          ptrTy,
+          builder.getPointerTo(fop.getFunctionType()),
           mlir::FlatSymbolRefAttr::get(mlirContext, fop.getSymNameAttr()));
     }
 
@@ -1402,10 +1395,9 @@ ConstantLValueEmitter::tryEmitBase(const APValue::LValueBase &base) {
           return cgm.getAddrOfGlobalVarAttr(vd);
 
         if (vd->isLocalVarDecl()) {
-          cir::GlobalLinkageKind linkage =
-              cgm.getCIRLinkageVarDefinition(vd, /*IsConstant=*/false);
-          return cgm.getBuilder().getGlobalViewAttr(
-              cgm.getOrCreateStaticVarDecl(*vd, linkage));
+          cgm.errorNYI(vd->getSourceRange(),
+                       "ConstantLValueEmitter: local var decl");
+          return {};
         }
       }
     }

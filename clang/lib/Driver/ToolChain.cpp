@@ -8,7 +8,6 @@
 
 #include "clang/Driver/ToolChain.h"
 #include "ToolChains/Arch/AArch64.h"
-#include "ToolChains/Arch/AMDGPU.h"
 #include "ToolChains/Arch/ARM.h"
 #include "ToolChains/Arch/RISCV.h"
 #include "ToolChains/Clang.h"
@@ -1280,7 +1279,8 @@ std::string ToolChain::ComputeLLVMTriple(const ArgList &Args,
     return getTripleString().str();
   case llvm::Triple::amdgcn: {
     llvm::Triple Triple = getTriple();
-    tools::AMDGPU::setArchNameInTriple(getDriver(), Args, InputType, Triple);
+    if (Args.getLastArgValue(options::OPT_mcpu_EQ) == "amdgcnspirv")
+      Triple.setArch(llvm::Triple::ArchType::spirv64);
     return Triple.getTriple();
   }
   case llvm::Triple::arm:

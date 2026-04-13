@@ -228,11 +228,6 @@ Expected<MappedFileRegionArena> MappedFileRegionArena::create(
               ") does not match existing config (" + utostr(H.HeaderOffset) +
               ")");
 
-    if (H.Capacity < MinCapacity)
-      return createStringError(
-          std::make_error_code(std::errc::bad_file_descriptor),
-          "capacity inside the MappedFileRegionArena is too small");
-
     // If the capacity doesn't match, use the existing capacity instead.
     if (H.Capacity != Capacity)
       Capacity = H.Capacity;
@@ -252,25 +247,15 @@ Expected<MappedFileRegionArena> MappedFileRegionArena::create(
   // Create the mapped region.
   {
     std::error_code EC;
-    const char *Name = nullptr;
-#ifdef _WIN32
-    // Give the file mapping a name to ensure the same mappings are
-    // shared across processes.
-    std::string MapName = Result.Path;
-    std::replace(MapName.begin(), MapName.end(), '\\', '/');
-    MapName = "Local\\" + MapName;
-    Name = MapName.c_str();
-#endif
     sys::fs::mapped_file_region Map(
-        File, sys::fs::mapped_file_region::readwrite, Capacity, 0, EC, Name);
+        File, sys::fs::mapped_file_region::readwrite, Capacity, 0, EC);
     if (EC)
       return createFileError(Result.Path, EC);
     Result.Region = std::move(Map);
   }
 
   // Initialize the header.
-  if (Error E = Result.initializeHeader(HeaderOffset))
-    return std::move(E);
+  Result.initializeHeader(HeaderOffset);
 
   if (FileSize->Size < MinCapacity) {
     assert(MainFile->Locked == sys::fs::LockKind::Exclusive);
@@ -341,30 +326,22 @@ void MappedFileRegionArena::destroyImpl() {
     Logger->logMappedFileRegionArenaClose(Path);
 }
 
-Error MappedFileRegionArena::initializeHeader(uint64_t HeaderOffset) {
-  if (capacity() >= static_cast<uint64_t>(INT64_MAX))
-    return createStringError(make_error_code(std::errc::protocol_error),
-                             "arena capacity does not fit in int64_t");
+void MappedFileRegionArena::initializeHeader(uint64_t HeaderOffset) {
+  assert(capacity() < (uint64_t)INT64_MAX && "capacity must fit in int64_t");
   uint64_t HeaderEndOffset = HeaderOffset + sizeof(decltype(*H));
-  if (HeaderEndOffset > capacity())
-    return createStringError(make_error_code(std::errc::protocol_error),
-                             "arena header extends past capacity");
-  if (!isAligned(Align::Of<decltype(*H)>(), HeaderOffset))
-    return createStringError(make_error_code(std::errc::protocol_error),
-                             "arena header offset is not aligned");
+  assert(HeaderEndOffset <= capacity() &&
+         "Expected end offset to be pre-allocated");
+  assert(isAligned(Align::Of<decltype(*H)>(), HeaderOffset) &&
+         "Expected end offset to be aligned");
   H = reinterpret_cast<decltype(H)>(data() + HeaderOffset);
 
   uint64_t ExistingValue = 0;
   if (!H->BumpPtr.compare_exchange_strong(ExistingValue, HeaderEndOffset))
-    if (ExistingValue < HeaderEndOffset)
-      return createStringError(
-          make_error_code(std::errc::protocol_error),
-          "arena bump pointer is corrupt: 0x" +
-              utohexstr(ExistingValue, /*LowerCase=*/true));
+    assert(ExistingValue >= HeaderEndOffset &&
+           "Expected 0, or past the end of the header itself");
   if (Logger)
     Logger->logMappedFileRegionArenaCreate(Path, *FD, data(), capacity(),
                                            size());
-  return Error::success();
 }
 
 static Error createAllocatorOutOfSpaceError() {

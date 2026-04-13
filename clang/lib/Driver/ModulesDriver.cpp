@@ -1231,11 +1231,11 @@ createClangModulePrecompileJob(Compilation &C, const Command &ImportingJob,
   Action *PA = C.MakeAction<PrecompileJobAction>(IA, types::ID::TY_ModuleFile);
   PA->propagateOffloadInfo(&ImportingJob.getSource());
 
-  const auto &TC = ImportingJob.getCreator().getToolChain();
-  const auto &TCArgs = C.getArgsForToolChain(&TC, PA->getOffloadingArch(),
-                                             PA->getOffloadingDeviceKind());
+  auto &TC = ImportingJob.getCreator().getToolChain();
+  auto &TCArgs = C.getArgsForToolChain(&TC, PA->getOffloadingArch(),
+                                       PA->getOffloadingDeviceKind());
 
-  const auto &BuildArgs = MD.getBuildArguments();
+  auto BuildArgs = MD.getBuildArguments();
   ArgStringList JobArgs;
   JobArgs.reserve(BuildArgs.size());
   for (const auto &Arg : BuildArgs)

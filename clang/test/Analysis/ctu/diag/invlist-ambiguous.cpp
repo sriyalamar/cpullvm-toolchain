@@ -14,5 +14,6 @@
 int foo(int);
 
 void test() {
-  foo(1); // expected-warning{{multiple invocations for '/some/path.cpp' are found in the invocation list}}
+  // expected-no-diagnostics
+  foo(1); // no-warning. Ignoring "Invocation list file contains multiple references to the same source file."
 }

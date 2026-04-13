@@ -780,21 +780,23 @@ Status ProcessMachCore::DoGetMemoryRegionInfo(addr_t load_addr,
       region_info.GetRange().SetRangeBase(permission_entry->GetRangeBase());
       region_info.GetRange().SetRangeEnd(permission_entry->GetRangeEnd());
       const Flags permissions(permission_entry->data);
-      region_info.SetReadable(
-          permissions.Test(ePermissionsReadable) ? eLazyBoolYes : eLazyBoolNo);
-      region_info.SetWritable(
-          permissions.Test(ePermissionsWritable) ? eLazyBoolYes : eLazyBoolNo);
+      region_info.SetReadable(permissions.Test(ePermissionsReadable)
+                                  ? MemoryRegionInfo::eYes
+                                  : MemoryRegionInfo::eNo);
+      region_info.SetWritable(permissions.Test(ePermissionsWritable)
+                                  ? MemoryRegionInfo::eYes
+                                  : MemoryRegionInfo::eNo);
       region_info.SetExecutable(permissions.Test(ePermissionsExecutable)
-                                    ? eLazyBoolYes
-                                    : eLazyBoolNo);
-      region_info.SetMapped(eLazyBoolYes);
+                                    ? MemoryRegionInfo::eYes
+                                    : MemoryRegionInfo::eNo);
+      region_info.SetMapped(MemoryRegionInfo::eYes);
     } else if (load_addr < permission_entry->GetRangeBase()) {
       region_info.GetRange().SetRangeBase(load_addr);
       region_info.GetRange().SetRangeEnd(permission_entry->GetRangeBase());
-      region_info.SetReadable(eLazyBoolNo);
-      region_info.SetWritable(eLazyBoolNo);
-      region_info.SetExecutable(eLazyBoolNo);
-      region_info.SetMapped(eLazyBoolNo);
+      region_info.SetReadable(MemoryRegionInfo::eNo);
+      region_info.SetWritable(MemoryRegionInfo::eNo);
+      region_info.SetExecutable(MemoryRegionInfo::eNo);
+      region_info.SetMapped(MemoryRegionInfo::eNo);
     }
     return Status();
   } else {
@@ -818,10 +820,10 @@ Status ProcessMachCore::DoGetMemoryRegionInfo(addr_t load_addr,
 
   region_info.GetRange().SetRangeBase(load_addr);
   region_info.GetRange().SetRangeEnd(LLDB_INVALID_ADDRESS);
-  region_info.SetReadable(eLazyBoolNo);
-  region_info.SetWritable(eLazyBoolNo);
-  region_info.SetExecutable(eLazyBoolNo);
-  region_info.SetMapped(eLazyBoolNo);
+  region_info.SetReadable(MemoryRegionInfo::eNo);
+  region_info.SetWritable(MemoryRegionInfo::eNo);
+  region_info.SetExecutable(MemoryRegionInfo::eNo);
+  region_info.SetMapped(MemoryRegionInfo::eNo);
   return Status();
 }
 

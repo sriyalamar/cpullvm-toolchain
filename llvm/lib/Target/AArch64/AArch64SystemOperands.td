@@ -880,17 +880,14 @@ class TLBIEntry<string name, bits<3> op1, bits<4> crm, bits<3> op2, bit nxs,
   : TLBICommon<name, op1, crm, op2, nxs, reguse>;
 
 class TLBIPEntry<string name, bits<3> op1, bits<4> crm, bits<3> op2, bit nxs,
-                 RegValue reguse>
-  : TLBICommon<name, op1, crm, op2, nxs, reguse> {
-  // TLBIP insns matching regex below allow either FEAT_D128 or FEAT_TLBID.
-  bit AllowWithTLBID = !match(name, ".*E[12][IO]S.*");
-}
+                RegValue reguse>
+  : TLBICommon<name, op1, crm, op2, nxs, reguse>;
 
-multiclass TLBITableBase<list<string> fields> {
+multiclass TLBITableBase {
   def NAME # Table : GenericTable {
     let FilterClass = NAME # "Entry";
     let CppTypeName = NAME;
-    let Fields = fields;
+    let Fields = ["Name", "Encoding", "RegUse", "RequiresStr"];
     string TypeOf_RegUse = "SysAliasRegUse";
     let PrimaryKey = ["Encoding"];
     let PrimaryKeyName = "lookup" # NAME # "ByEncoding";
@@ -901,10 +898,8 @@ multiclass TLBITableBase<list<string> fields> {
   }
 }
 
-defm TLBI : TLBITableBase<
-    ["Name", "Encoding", "RegUse", "RequiresStr"]>;
-defm TLBIP : TLBITableBase<
-    ["Name", "Encoding", "RegUse", "RequiresStr", "AllowWithTLBID"]>;
+defm TLBI  : TLBITableBase;
+defm TLBIP : TLBITableBase;
 
 class TLBI<string name, bits<3> op1, bits<4> crm, bits<3> op2,
            RegValue reguse, bit hasTLBIP = 0> {
@@ -960,9 +955,10 @@ foreach I = TLBIBase in {
   }
 
   if I.HasTLBIP then {
-    def : TLBIPEntry<I.Name, I.Op1, I.CRm, I.Op2, 0, I.RegUse>;
-    def : TLBIPEntry<!strconcat(I.Name, "nXS"), I.Op1, I.CRm, I.Op2, 1,
-                     I.RegUse>;
+    let Requires = ["AArch64::FeatureD128"] in {
+      def : TLBIPEntry<I.Name, I.Op1, I.CRm, I.Op2, 0, I.RegUse>;
+      def : TLBIPEntry<!strconcat(I.Name, "nXS"), I.Op1, I.CRm, I.Op2, 1, I.RegUse>;
+    }
   }
 }
 
@@ -1027,9 +1023,10 @@ foreach I = TLBIRMI in {
   }
 
   if I.HasTLBIP then {
-    def : TLBIPEntry<I.Name, I.Op1, I.CRm, I.Op2, 0, I.RegUse>;
-    def : TLBIPEntry<!strconcat(I.Name, "nXS"), I.Op1, I.CRm, I.Op2, 1,
-                     I.RegUse>;
+    let Requires = ["AArch64::FeatureD128"] in {
+      def : TLBIPEntry<I.Name, I.Op1, I.CRm, I.Op2, 0, I.RegUse>;
+      def : TLBIPEntry<!strconcat(I.Name, "nXS"), I.Op1, I.CRm, I.Op2, 1, I.RegUse>;
+    }
   }
 }
 

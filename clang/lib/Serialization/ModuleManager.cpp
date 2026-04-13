@@ -28,7 +28,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/Support/DOTGraphTraits.h"
-#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -189,36 +188,33 @@ ModuleManager::AddModuleResult ModuleManager::addModule(
     // import it earlier.
     return OutOfDate;
   } else {
-    auto Buf = [&]() -> Expected<std::unique_ptr<llvm::MemoryBuffer>> {
-      // Implicit modules live in the module cache.
-      if (FileName.getImplicitModuleSuffixLength())
-        return ModCache.read(FileName, Size, ModTime);
-
-      // Explicit modules are treated as any other compiler input file, load
-      // them via FileManager.
-      Expected<FileEntryRef> Entry =
-          FileName == StringRef("-")
-              ? FileMgr.getSTDIN()
-              : FileMgr.getFileRef(FileName, /*OpenFile=*/true,
-                                   /*CacheFailure=*/false);
-      if (!Entry)
-        return Entry.takeError();
-
-      Size = Entry->getSize();
-      ModTime = Entry->getModificationTime();
-
-      // RequiresNullTerminator is false because module files don't need it, and
-      // this allows the file to still be mmapped.
-      return llvm::errorOrToExpected(
-          FileMgr.getBufferForFile(*Entry, /*IsVolatile=*/false,
-                                   /*RequiresNullTerminator=*/false));
-    }();
-
-    if (!Buf) {
-      ErrorStr = llvm::toString(Buf.takeError());
+    OptionalFileEntryRef Entry =
+        expectedToOptional(FileName == StringRef("-")
+                               ? FileMgr.getSTDIN()
+                               : FileMgr.getFileRef(FileName, /*OpenFile=*/true,
+                                                    /*CacheFailure=*/false));
+    if (!Entry) {
+      ErrorStr = "module file not found";
       return Missing;
     }
 
+    // Get a buffer of the file and close the file descriptor when done.
+    // The file is volatile because in a parallel build we expect multiple
+    // compiler processes to use the same module file rebuilding it if needed.
+    //
+    // RequiresNullTerminator is false because module files don't need it, and
+    // this allows the file to still be mmapped.
+    auto Buf = FileMgr.getBufferForFile(*Entry,
+                                        /*IsVolatile=*/true,
+                                        /*RequiresNullTerminator=*/false);
+
+    if (!Buf) {
+      ErrorStr = Buf.getError().message();
+      return Missing;
+    }
+
+    Size = Entry->getSize();
+    ModTime = Entry->getModificationTime();
     NewFileBuffer = std::move(*Buf);
     ModuleBuffer = NewFileBuffer.get();
   }

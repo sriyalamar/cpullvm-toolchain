@@ -545,7 +545,7 @@ ValueObjectSP StackFrame::DILGetValueForVariableExpressionPath(
   auto lex_or_err = dil::DILLexer::Create(var_expr, mode);
   if (!lex_or_err) {
     error = Status::FromError(lex_or_err.takeError());
-    return ValueObjectConstResult::Create(nullptr, error.Clone());
+    return ValueObjectConstResult::Create(nullptr, std::move(error));
   }
 
   // Parse the expression.
@@ -554,7 +554,7 @@ ValueObjectSP StackFrame::DILGetValueForVariableExpressionPath(
                             shared_from_this(), use_dynamic, options);
   if (!tree_or_error) {
     error = Status::FromError(tree_or_error.takeError());
-    return ValueObjectConstResult::Create(nullptr, error.Clone());
+    return ValueObjectConstResult::Create(nullptr, std::move(error));
   }
 
   // Evaluate the parsed expression.
@@ -565,7 +565,7 @@ ValueObjectSP StackFrame::DILGetValueForVariableExpressionPath(
   auto valobj_or_error = interpreter.Evaluate(**tree_or_error);
   if (!valobj_or_error) {
     error = Status::FromError(valobj_or_error.takeError());
-    return ValueObjectConstResult::Create(nullptr, error.Clone());
+    return ValueObjectConstResult::Create(nullptr, std::move(error));
   }
 
   var_sp = (*valobj_or_error)->GetVariable();
@@ -1174,7 +1174,7 @@ llvm::Error StackFrame::GetFrameBaseValue(Scalar &frame_base) {
       if (!expr_value)
         m_frame_base_error = Status::FromError(expr_value.takeError());
       else
-        m_frame_base = expr_value->GetScalar();
+        m_frame_base = expr_value->ResolveValue(&exe_ctx);
     } else {
       m_frame_base_error =
           Status::FromErrorString("No function in symbol context.");
@@ -1301,7 +1301,7 @@ const char *StackFrame::GetFunctionName() {
       const InlineFunctionInfo *inlined_info =
           inlined_block->GetInlinedFunctionInfo();
       if (inlined_info)
-        name = inlined_info->GetName().AsCString(nullptr);
+        name = inlined_info->GetName().AsCString();
     }
   }
 
@@ -1328,7 +1328,7 @@ const char *StackFrame::GetDisplayFunctionName() {
       const InlineFunctionInfo *inlined_info =
           inlined_block->GetInlinedFunctionInfo();
       if (inlined_info)
-        name = inlined_info->GetDisplayName().AsCString(nullptr);
+        name = inlined_info->GetDisplayName().AsCString();
     }
   }
 
@@ -1411,8 +1411,8 @@ GetBaseExplainingValue(const Instruction::Operand &operand,
     return base_and_offset;
   }
   case Instruction::Operand::Type::Register: {
-    const RegisterInfo *info = register_context.GetRegisterInfoByName(
-        operand.m_register.AsCString(nullptr));
+    const RegisterInfo *info =
+        register_context.GetRegisterInfoByName(operand.m_register.AsCString());
     if (!info) {
       return std::make_pair(nullptr, 0);
     }
@@ -1654,7 +1654,7 @@ lldb::ValueObjectSP DoGuessValueAt(StackFrame &frame, ConstString reg,
   using namespace OperandMatchers;
 
   const RegisterInfo *reg_info =
-      frame.GetRegisterContext()->GetRegisterInfoByName(reg.AsCString(nullptr));
+      frame.GetRegisterContext()->GetRegisterInfoByName(reg.AsCString());
   if (!reg_info) {
     return ValueObjectSP();
   }

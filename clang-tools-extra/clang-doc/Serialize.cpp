@@ -27,13 +27,13 @@ namespace doc {
 namespace serialize {
 
 namespace {
-static StringRef exprToString(const clang::Expr *E) {
+static SmallString<16> exprToString(const clang::Expr *E) {
   clang::LangOptions Opts;
   clang::PrintingPolicy Policy(Opts);
   SmallString<16> Result;
   llvm::raw_svector_ostream OS(Result);
   E->printPretty(OS, nullptr, Policy);
-  return internString(Result);
+  return Result;
 }
 } // namespace
 
@@ -86,7 +86,8 @@ void Serializer::getTemplateParameters(
 
 // Extract the full function prototype from a FunctionDecl including
 // Full Decl
-StringRef Serializer::getFunctionPrototype(const FunctionDecl *FuncDecl) {
+llvm::SmallString<256>
+Serializer::getFunctionPrototype(const FunctionDecl *FuncDecl) {
   llvm::SmallString<256> Result;
   llvm::raw_svector_ostream Stream(Result);
   const ASTContext &Ctx = FuncDecl->getASTContext();
@@ -153,10 +154,10 @@ StringRef Serializer::getFunctionPrototype(const FunctionDecl *FuncDecl) {
   if (auto ExceptionSpecType = FuncDecl->getExceptionSpecType())
     Stream << " " << ExceptionSpecType;
 
-  return internString(Result);
+  return Result; // Convert SmallString to std::string for return
 }
 
-StringRef Serializer::getTypeAlias(const TypeAliasDecl *Alias) {
+llvm::SmallString<16> Serializer::getTypeAlias(const TypeAliasDecl *Alias) {
   llvm::SmallString<16> Result;
   llvm::raw_svector_ostream Stream(Result);
   const ASTContext &Ctx = Alias->getASTContext();
@@ -166,7 +167,7 @@ StringRef Serializer::getTypeAlias(const TypeAliasDecl *Alias) {
   QualType Q = Alias->getUnderlyingType();
   Q.print(Stream, Ctx.getPrintingPolicy());
 
-  return internString(Result);
+  return Result;
 }
 
 // A function to extract the appropriate relative path for a given info's
@@ -182,15 +183,15 @@ StringRef Serializer::getTypeAlias(const TypeAliasDecl *Alias) {
 //
 // }
 // }
-StringRef Serializer::getInfoRelativePath(
+llvm::SmallString<128> Serializer::getInfoRelativePath(
     const llvm::SmallVectorImpl<doc::Reference> &Namespaces) {
   llvm::SmallString<128> Path;
   for (auto R = Namespaces.rbegin(), E = Namespaces.rend(); R != E; ++R)
     llvm::sys::path::append(Path, R->Name);
-  return internString(Path);
+  return Path;
 }
 
-StringRef Serializer::getInfoRelativePath(const Decl *D) {
+llvm::SmallString<128> Serializer::getInfoRelativePath(const Decl *D) {
   llvm::SmallVector<Reference, 4> Namespaces;
   // The third arg in populateParentNamespaces is a boolean passed by reference,
   // its value is not relevant in here so it's not used anywhere besides the
@@ -219,7 +220,7 @@ public:
   void visitVerbatimLineComment(const VerbatimLineComment *C);
 
 private:
-  StringRef getCommandName(unsigned CommandID) const;
+  std::string getCommandName(unsigned CommandID) const;
   bool isWhitespaceOnly(StringRef S) const;
 
   CommentInfo &CurrentCI;
@@ -243,112 +244,87 @@ void ClangDocCommentVisitor::visitTextComment(const TextComment *C) {
 
 void ClangDocCommentVisitor::visitInlineCommandComment(
     const InlineCommandComment *C) {
-  CurrentCI.Name = internString(getCommandName(C->getCommandID()));
-  llvm::SmallVector<StringRef> Args;
+  CurrentCI.Name = getCommandName(C->getCommandID());
   for (unsigned I = 0, E = C->getNumArgs(); I != E; ++I)
-    Args.push_back(internString(C->getArgText(I).trim()));
-  if (!Args.empty()) {
-    StringRef *ArgsMem = TransientArena.Allocate<StringRef>(Args.size());
-    std::uninitialized_copy(Args.begin(), Args.end(), ArgsMem);
-    CurrentCI.Args = llvm::ArrayRef<StringRef>(ArgsMem, Args.size());
-  }
+    CurrentCI.Args.push_back(C->getArgText(I).trim());
 }
 
 void ClangDocCommentVisitor::visitHTMLStartTagComment(
     const HTMLStartTagComment *C) {
-  CurrentCI.Name = internString(C->getTagName());
+  CurrentCI.Name = C->getTagName();
   CurrentCI.SelfClosing = C->isSelfClosing();
-  llvm::SmallVector<StringRef> AttrKeys;
-  llvm::SmallVector<StringRef> AttrValues;
   for (unsigned I = 0, E = C->getNumAttrs(); I < E; ++I) {
     const HTMLStartTagComment::Attribute &Attr = C->getAttr(I);
-    AttrKeys.push_back(internString(Attr.Name));
-    AttrValues.push_back(internString(Attr.Value));
-  }
-  if (!AttrKeys.empty()) {
-    StringRef *KeysMem = TransientArena.Allocate<StringRef>(AttrKeys.size());
-    std::uninitialized_copy(AttrKeys.begin(), AttrKeys.end(), KeysMem);
-    CurrentCI.AttrKeys = llvm::ArrayRef<StringRef>(KeysMem, AttrKeys.size());
-  }
-  if (!AttrValues.empty()) {
-    StringRef *ValuesMem =
-        TransientArena.Allocate<StringRef>(AttrValues.size());
-    std::uninitialized_copy(AttrValues.begin(), AttrValues.end(), ValuesMem);
-    CurrentCI.AttrValues =
-        llvm::ArrayRef<StringRef>(ValuesMem, AttrValues.size());
+    CurrentCI.AttrKeys.push_back(Attr.Name);
+    CurrentCI.AttrValues.push_back(Attr.Value);
   }
 }
 
 void ClangDocCommentVisitor::visitHTMLEndTagComment(
     const HTMLEndTagComment *C) {
-  CurrentCI.Name = internString(C->getTagName());
+  CurrentCI.Name = C->getTagName();
   CurrentCI.SelfClosing = true;
 }
 
 void ClangDocCommentVisitor::visitBlockCommandComment(
     const BlockCommandComment *C) {
-  CurrentCI.Name = internString(getCommandName(C->getCommandID()));
-  llvm::SmallVector<StringRef> Args;
+  CurrentCI.Name = getCommandName(C->getCommandID());
   for (unsigned I = 0, E = C->getNumArgs(); I < E; ++I)
-    Args.push_back(internString(C->getArgText(I).trim()));
-  if (!Args.empty()) {
-    StringRef *ArgsMem = TransientArena.Allocate<StringRef>(Args.size());
-    std::uninitialized_copy(Args.begin(), Args.end(), ArgsMem);
-    CurrentCI.Args = llvm::ArrayRef<StringRef>(ArgsMem, Args.size());
-  }
+    CurrentCI.Args.push_back(C->getArgText(I).trim());
 }
 
 void ClangDocCommentVisitor::visitParamCommandComment(
     const ParamCommandComment *C) {
-  CurrentCI.Direction = internString(
-      ParamCommandComment::getDirectionAsString(C->getDirection()));
+  CurrentCI.Direction =
+      ParamCommandComment::getDirectionAsString(C->getDirection());
   CurrentCI.Explicit = C->isDirectionExplicit();
   if (C->hasParamName())
-    CurrentCI.ParamName = internString(C->getParamNameAsWritten());
+    CurrentCI.ParamName = C->getParamNameAsWritten();
 }
 
 void ClangDocCommentVisitor::visitTParamCommandComment(
     const TParamCommandComment *C) {
   if (C->hasParamName())
-    CurrentCI.ParamName = internString(C->getParamNameAsWritten());
+    CurrentCI.ParamName = C->getParamNameAsWritten();
 }
 
 void ClangDocCommentVisitor::visitVerbatimBlockComment(
     const VerbatimBlockComment *C) {
-  CurrentCI.Name = internString(getCommandName(C->getCommandID()));
-  CurrentCI.CloseName = internString(C->getCloseName());
+  CurrentCI.Name = getCommandName(C->getCommandID());
+  CurrentCI.CloseName = C->getCloseName();
 }
 
 void ClangDocCommentVisitor::visitVerbatimBlockLineComment(
     const VerbatimBlockLineComment *C) {
   if (!isWhitespaceOnly(C->getText()))
-    CurrentCI.Text = internString(C->getText());
+    CurrentCI.Text = C->getText();
 }
 
 void ClangDocCommentVisitor::visitVerbatimLineComment(
     const VerbatimLineComment *C) {
   if (!isWhitespaceOnly(C->getText()))
-    CurrentCI.Text = internString(C->getText());
+    CurrentCI.Text = C->getText();
 }
 
 bool ClangDocCommentVisitor::isWhitespaceOnly(llvm::StringRef S) const {
   return llvm::all_of(S, isspace);
 }
 
-StringRef ClangDocCommentVisitor::getCommandName(unsigned CommandID) const {
+std::string ClangDocCommentVisitor::getCommandName(unsigned CommandID) const {
   const CommandInfo *Info = CommandTraits::getBuiltinCommandInfo(CommandID);
   if (Info)
-    return internString(Info->Name);
+    return Info->Name;
   // TODO: Add parsing for \file command.
   return "<not a builtin command>";
 }
 
 // Serializing functions.
 
-StringRef Serializer::getSourceCode(const Decl *D, const SourceRange &R) {
-  return internString(Lexer::getSourceText(
-      CharSourceRange::getTokenRange(R), D->getASTContext().getSourceManager(),
-      D->getASTContext().getLangOpts()));
+std::string Serializer::getSourceCode(const Decl *D, const SourceRange &R) {
+  return Lexer::getSourceText(CharSourceRange::getTokenRange(R),
+                              D->getASTContext().getSourceManager(),
+                              D->getASTContext().getLangOpts())
+      .str();
 }
 
 template <typename T>
@@ -458,10 +434,8 @@ bool Serializer::shouldSerializeInfo(bool PublicOnly,
 //
 // See MakeAndInsertIntoParent().
 void Serializer::InsertChild(ScopeChildren &Scope, const NamespaceInfo &Info) {
-  Reference *R = allocatePtr<Reference>(TransientArena, Info.USR, Info.Name,
-                                        InfoType::IT_namespace, Info.Name,
-                                        getInfoRelativePath(Info.Namespace));
-  Scope.Namespaces.push_back(*R);
+  Scope.Namespaces.emplace_back(Info.USR, Info.Name, InfoType::IT_namespace,
+                                Info.Name, getInfoRelativePath(Info.Namespace));
 }
 
 void Serializer::InsertChild(ScopeChildren &Scope, const RecordInfo &Info) {
@@ -616,9 +590,7 @@ void Serializer::parseParameters(FunctionInfo &I, const FunctionDecl *D) {
   for (const ParmVarDecl *P : D->parameters()) {
     FieldTypeInfo &FieldInfo = I.Params.emplace_back(
         getTypeInfoForType(P->getOriginalType(), LO), P->getNameAsString());
-    if (std::optional<StringRef> DefaultValue =
-            getSourceCode(D, P->getDefaultArgRange()))
-      FieldInfo.DefaultValue = *DefaultValue;
+    FieldInfo.DefaultValue = getSourceCode(D, P->getDefaultArgRange());
   }
 }
 
@@ -639,7 +611,7 @@ void Serializer::parseBases(RecordInfo &I, const CXXRecordDecl *D) {
     } else if (const RecordDecl *P = getRecordDeclForType(B.getType()))
       I.Parents.emplace_back(getUSRForDecl(P), P->getNameAsString(),
                              InfoType::IT_record, P->getQualifiedNameAsString(),
-                             internString(getInfoRelativePath(P)));
+                             getInfoRelativePath(P));
     else
       I.Parents.emplace_back(SymbolID(), B.getType().getAsString());
   }
@@ -647,7 +619,7 @@ void Serializer::parseBases(RecordInfo &I, const CXXRecordDecl *D) {
     if (const RecordDecl *P = getRecordDeclForType(B.getType()))
       I.VirtualParents.emplace_back(
           getUSRForDecl(P), P->getNameAsString(), InfoType::IT_record,
-          P->getQualifiedNameAsString(), internString(getInfoRelativePath(P)));
+          P->getQualifiedNameAsString(), getInfoRelativePath(P));
     else
       I.VirtualParents.emplace_back(SymbolID(), B.getType().getAsString());
   }
@@ -760,10 +732,9 @@ void Serializer::populateInfo(Info &I, const T *D, const FullComment *C,
       ConversionDecl && ConversionDecl->getConversionType()
                             .getTypePtr()
                             ->isTemplateTypeParmType())
-    I.Name = internString("operator " +
-                          ConversionDecl->getConversionType().getAsString());
+    I.Name = "operator " + ConversionDecl->getConversionType().getAsString();
   else
-    I.Name = internString(D->getNameAsString());
+    I.Name = D->getNameAsString();
   populateParentNamespaces(I.Namespace, D, IsInAnonymousNamespace);
   if (C) {
     I.Description.emplace_back();
@@ -793,10 +764,9 @@ void Serializer::populateSymbolInfo(SymbolInfo &I, const T *D,
   // different filesystems, with a 5 character buffer for file extensions.
   if (MangledName.size() > 250) {
     auto SymbolID = llvm::toStringRef(llvm::toHex(I.USR)).str();
-    I.MangledName =
-        internString(MangledName.substr(0, 250 - SymbolID.size()) + SymbolID);
+    I.MangledName = MangledName.substr(0, 250 - SymbolID.size()) + SymbolID;
   } else
-    I.MangledName = internString(MangledName);
+    I.MangledName = MangledName;
   delete Mangler;
 }
 
@@ -814,7 +784,7 @@ void Serializer::handleCompoundConstraints(
     auto *Concept = dyn_cast<ConceptSpecializationExpr>(Constraint);
     ConstraintInfo CI(getUSRForDecl(Concept->getNamedConcept()),
                       Concept->getNamedConcept()->getNameAsString());
-    CI.ConstraintExpr = internString(exprToString(Concept));
+    CI.ConstraintExpr = exprToString(Concept);
     ConstraintInfos.push_back(CI);
   }
 }
@@ -835,7 +805,7 @@ void Serializer::populateConstraints(TemplateInfo &I, const TemplateDecl *D) {
                 Constraint.ConstraintExpr)) {
       ConstraintInfo CI(getUSRForDecl(ConstraintExpr->getNamedConcept()),
                         ConstraintExpr->getNamedConcept()->getNameAsString());
-      CI.ConstraintExpr = internString(exprToString(ConstraintExpr));
+      CI.ConstraintExpr = exprToString(ConstraintExpr);
       I.Constraints.push_back(std::move(CI));
     } else {
       handleCompoundConstraints(Constraint.ConstraintExpr, I.Constraints);
@@ -920,16 +890,16 @@ void Serializer::parseBases(RecordInfo &I, const CXXRecordDecl *D,
         // Initialized without USR and name, this will be set in the following
         // if-else stmt.
         BaseRecordInfo BI(
-            {}, "", internString(getInfoRelativePath(Base)), B.isVirtual(),
+            {}, "", getInfoRelativePath(Base), B.isVirtual(),
             getFinalAccessSpecifier(ParentAccess, B.getAccessSpecifier()),
             IsParent);
         if (const auto *Ty = B.getType()->getAs<TemplateSpecializationType>()) {
           const TemplateDecl *D = Ty->getTemplateName().getAsTemplateDecl();
           BI.USR = getUSRForDecl(D);
-          BI.Name = internString(B.getType().getAsString());
+          BI.Name = B.getType().getAsString();
         } else {
           BI.USR = getUSRForDecl(Base);
-          BI.Name = internString(Base->getNameAsString());
+          BI.Name = Base->getNameAsString();
         }
         parseFields(BI, Base, PublicOnly, BI.Access);
         for (const auto &Decl : Base->decls())
@@ -971,7 +941,9 @@ Serializer::emitInfo(const NamespaceDecl *D, const FullComment *FC,
   if (!shouldSerializeInfo(PublicOnly, IsInAnonymousNamespace, D))
     return {};
 
-  NSI->Name = D->isAnonymousNamespace() ? "@nonymous_namespace" : NSI->Name;
+  NSI->Name = D->isAnonymousNamespace()
+                  ? llvm::SmallString<16>("@nonymous_namespace")
+                  : NSI->Name;
   NSI->Path = getInfoRelativePath(NSI->Namespace);
   if (NSI->Namespace.empty() && NSI->USR == SymbolID())
     return {OwnedPtr<Info>{std::move(NSI)}, nullptr};
@@ -1015,7 +987,8 @@ void Serializer::parseFriends(RecordInfo &RI, const CXXRecordDecl *D) {
     if (auto *FuncDecl = dyn_cast_or_null<FunctionDecl>(ActualDecl)) {
       FunctionInfo TempInfo;
       parseParameters(TempInfo, FuncDecl);
-      F.Params = allocateArray<FieldTypeInfo>(TempInfo.Params, TransientArena);
+      F.Params.emplace();
+      F.Params = std::move(TempInfo.Params);
       F.ReturnType = getTypeInfoForType(FuncDecl->getReturnType(),
                                         FuncDecl->getLangOpts());
     }
@@ -1046,7 +1019,7 @@ Serializer::emitInfo(const RecordDecl *D, const FullComment *FC, Location Loc,
 
   if (const auto *C = dyn_cast<CXXRecordDecl>(D)) {
     if (const TypedefNameDecl *TD = C->getTypedefNameForAnonDecl()) {
-      RI->Name = internString(TD->getNameAsString());
+      RI->Name = TD->getNameAsString();
       RI->IsTypeDef = true;
     }
     // TODO: remove first call to parseBases, that function should be deleted
@@ -1054,7 +1027,7 @@ Serializer::emitInfo(const RecordDecl *D, const FullComment *FC, Location Loc,
     parseBases(*RI, C, /*IsFileInRootDir=*/true, PublicOnly, /*IsParent=*/true);
     parseFriends(*RI, C);
   }
-  RI->Path = internString(getInfoRelativePath(RI->Namespace));
+  RI->Path = getInfoRelativePath(RI->Namespace);
 
   populateTemplateParameters(RI->Template, D);
   if (RI->Template)

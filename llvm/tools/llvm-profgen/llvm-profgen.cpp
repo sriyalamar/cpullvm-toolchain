@@ -168,8 +168,6 @@ int main(int argc, const char *argv[]) {
     auto FS = vfs::getRealFileSystem();
     auto ReaderOrErr =
         SampleProfileReader::create(SampleProfFilename, Context, *FS);
-    if (std::error_code EC = ReaderOrErr.getError())
-      exitWithError(EC, SampleProfFilename);
     std::unique_ptr<sampleprof::SampleProfileReader> Reader =
         std::move(ReaderOrErr.get());
     Reader->read();

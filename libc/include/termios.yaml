@@ -1,9 +1,6 @@
 header: termios.h
-standards:
-  - posix
-macros:
-  - macro_name: NCCS
-    macro_header: termios-macros.h
+header_template: termios.h.def
+macros: []
 types:
   - type_name: tcflag_t
   - type_name: struct_termios

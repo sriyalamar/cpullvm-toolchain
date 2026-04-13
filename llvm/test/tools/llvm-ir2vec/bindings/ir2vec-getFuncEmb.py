@@ -6,10 +6,7 @@ import ir2vec
 ll_file = sys.argv[1]
 vocab_path = sys.argv[2]
 
-vocab = ir2vec.loadVocab(vocab_path)
-tool = ir2vec.initEmbedding(
-    filename=ll_file, mode=ir2vec.IR2VecKind.Symbolic, vocab=vocab
-)
+tool = ir2vec.initEmbedding(filename=ll_file, mode="sym", vocabPath=vocab_path)
 
 # Success case
 emb = tool.getFuncEmb("add")

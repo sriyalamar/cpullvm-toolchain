@@ -1474,7 +1474,7 @@ public:
     if (DRE->isNonOdrUse() && (L == Linkage::Internal || L == Linkage::None))
       if (auto *VD = dyn_cast<VarDecl>(Referenced);
           VD && VD->getInit() && !VD->getInit()->isValueDependent() &&
-          VD->getInit()->isConstantInitializer(Context))
+          VD->getInit()->isConstantInitializer(Context, /*IsForRef=*/false))
         return true;
 
     Callback(DRE, Referenced);

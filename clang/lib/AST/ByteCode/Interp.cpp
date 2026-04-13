@@ -41,7 +41,7 @@ using namespace clang::interp;
 // to handle the way we use tailcalls.
 // PPC can't tail-call external calls, which is a problem for InterpNext.
 #if defined(_MSC_VER) || defined(__powerpc__) || !defined(MUSTTAIL) ||         \
-    defined(__i386__) || defined(__sparc__)
+    defined(__i386__)
 #undef MUSTTAIL
 #define MUSTTAIL
 #define USE_TAILCALLS 0
@@ -259,16 +259,14 @@ void cleanupAfterFunctionCall(InterpState &S, CodePtr OpPC,
     S.Stk.discard<Pointer>();
 }
 
-bool isConstexprUnknown(const Block *B) {
-  if (B->isDummy())
-    return isa_and_nonnull<ParmVarDecl>(B->getDescriptor()->asValueDecl());
-  return B->getDescriptor()->IsConstexprUnknown;
-}
-
 bool isConstexprUnknown(const Pointer &P) {
   if (!P.isBlockPointer())
     return false;
-  return isConstexprUnknown(P.block());
+
+  if (P.isDummy())
+    return isa_and_nonnull<ParmVarDecl>(P.getDeclDesc()->asValueDecl());
+
+  return P.getDeclDesc()->IsConstexprUnknown;
 }
 
 bool CheckBCPResult(InterpState &S, const Pointer &Ptr) {
@@ -816,7 +814,7 @@ bool CheckLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
     return false;
   if (!CheckVolatile(S, OpPC, Ptr, AK))
     return false;
-  if (isConstexprUnknown(Ptr))
+  if (!Ptr.isConst() && !S.inConstantContext() && isConstexprUnknown(Ptr))
     return false;
   return true;
 }
@@ -851,8 +849,6 @@ bool CheckFinalLoad(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
     return false;
   if (!CheckMutable(S, OpPC, Ptr))
     return false;
-  if (Ptr.isConstexprUnknown())
-    return false;
   return true;
 }
 
@@ -886,9 +882,9 @@ bool CheckStore(InterpState &S, CodePtr OpPC, const Pointer &Ptr,
 }
 
 static bool CheckInvoke(InterpState &S, CodePtr OpPC, const Pointer &Ptr) {
-  if (!Ptr.isDummy() && !isConstexprUnknown(Ptr)) {
-    if (!CheckLive(S, OpPC, Ptr, AK_MemberCall))
-      return false;
+  if (!CheckLive(S, OpPC, Ptr, AK_MemberCall))
+    return false;
+  if (!Ptr.isDummy()) {
     if (!CheckExtern(S, OpPC, Ptr))
       return false;
     if (!CheckRange(S, OpPC, Ptr, AK_MemberCall))
@@ -2206,25 +2202,6 @@ bool CheckBitCast(InterpState &S, CodePtr OpPC, bool HasIndeterminateBits,
   S.FFDiag(E, diag::note_constexpr_bit_cast_indet_dest)
       << ExprType << S.getLangOpts().CharIsSigned << E->getSourceRange();
   return false;
-}
-
-bool handleReference(InterpState &S, CodePtr OpPC, Block *B) {
-  if (isConstexprUnknown(B)) {
-    S.Stk.push<Pointer>(B);
-    return true;
-  }
-
-  const auto &ID = B->getBlockDesc<const InlineDescriptor>();
-  if (!ID.IsInitialized) {
-    if (!S.checkingPotentialConstantExpression())
-      S.FFDiag(S.Current->getSource(OpPC),
-               diag::note_constexpr_use_uninit_reference);
-    return false;
-  }
-
-  assert(B->getDescriptor()->getPrimType() == PT_Ptr);
-  S.Stk.push<Pointer>(B->deref<Pointer>());
-  return true;
 }
 
 bool GetTypeid(InterpState &S, CodePtr OpPC, const Type *TypePtr,

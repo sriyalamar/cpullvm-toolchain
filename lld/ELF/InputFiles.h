@@ -356,7 +356,7 @@ public:
   template <typename ELFT> void parse();
 
   // Used for --as-needed
-  std::atomic<bool> isNeeded;
+  bool isNeeded;
 
   // Non-weak undefined symbols which are not yet resolved when the SO is
   // parsed. Only filled for `--no-allow-shlib-undefined`.

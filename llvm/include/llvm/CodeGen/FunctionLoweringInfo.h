@@ -162,9 +162,9 @@ public:
   struct LiveOutInfo {
     unsigned NumSignBits : 31;
     unsigned IsValid : 1;
-    KnownBits Known;
+    KnownBits Known = 1;
 
-    LiveOutInfo() : NumSignBits(0), IsValid(true), Known(1) {}
+    LiveOutInfo() : NumSignBits(0), IsValid(true) {}
   };
 
   /// Record the preferred extend type (ISD::SIGN_EXTEND or ISD::ZERO_EXTEND)

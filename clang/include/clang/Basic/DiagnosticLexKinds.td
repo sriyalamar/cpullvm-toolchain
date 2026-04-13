@@ -377,12 +377,9 @@ class NonportablePath  : Warning<
   "non-portable path to file '%0'; specified path differs in case from file"
   " name on disk">;
 def pp_nonportable_path : NonportablePath,
-  InGroup<NonportableIncludePath>;
+  InGroup<DiagGroup<"nonportable-include-path">>;
 def pp_nonportable_system_path : NonportablePath, DefaultIgnore,
   InGroup<DiagGroup<"nonportable-system-include-path">>;
-def pp_nonportable_path_separator : Warning<
-  "non-portable path to file '%0'; specified path contains backslashes">,
-  DefaultIgnore, InGroup<NonportableIncludePathSeparator>;
 
 def pp_pragma_once_in_main_file : Warning<"#pragma once in main file">,
   InGroup<DiagGroup<"pragma-once-outside-header">>;
@@ -772,9 +769,7 @@ def err_paste_at_start : Error<
   "'##' cannot appear at start of macro expansion">;
 def err_paste_at_end : Error<"'##' cannot appear at end of macro expansion">;
 def ext_paste_comma : Extension<
-  "token pasting of ',' and '__VA_ARGS__' is a GNU extension%select{|; "
-  "consider using '__VA_OPT__(,)' instead}0">,
-  InGroup<GNUZeroVariadicMacroArguments>;
+  "token pasting of ',' and __VA_ARGS__ is a GNU extension">, InGroup<GNUZeroVariadicMacroArguments>;
 def err_unterm_macro_invoc : Error<
   "unterminated function-like macro invocation">;
 def err_too_many_args_in_macro_invoc : Error<

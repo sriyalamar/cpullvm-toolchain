@@ -67,18 +67,17 @@ namespace Intrinsic {
   /// overloads are required, it is safe to use this version, but better to use
   /// the StringRef version. If one of the types is based on an unnamed type, a
   /// function type will be computed. Providing FT will avoid this computation.
-  LLVM_ABI std::string getName(ID Id, ArrayRef<Type *> OverloadTys, Module *M,
+  LLVM_ABI std::string getName(ID Id, ArrayRef<Type *> Tys, Module *M,
                                FunctionType *FT = nullptr);
 
   /// Return the LLVM name for an intrinsic. This is a special version only to
   /// be used by LLVMIntrinsicCopyOverloadedName. It only supports overloads
   /// based on named types.
-  LLVM_ABI std::string getNameNoUnnamedTypes(ID Id,
-                                             ArrayRef<Type *> OverloadTys);
+  LLVM_ABI std::string getNameNoUnnamedTypes(ID Id, ArrayRef<Type *> Tys);
 
   /// Return the function type for an intrinsic.
   LLVM_ABI FunctionType *getType(LLVMContext &Context, ID id,
-                                 ArrayRef<Type *> OverloadTys = {});
+                                 ArrayRef<Type *> Tys = {});
 
   /// Returns true if the intrinsic can be overloaded.
   LLVM_ABI bool isOverloaded(ID id);
@@ -102,12 +101,12 @@ namespace Intrinsic {
   /// \p M. If it does not exist, add a declaration and return it. Otherwise,
   /// return the existing declaration.
   ///
-  /// The \p OverloadTys parameter is for intrinsics with overloaded types
-  // (e.g., those using iAny, fAny, vAny, or pAny).  For a declaration of an
-  // overloaded intrinsic, OverloadTys must provide exactly one type for each
-  // overloaded type in the intrinsic.
+  /// The \p Tys parameter is for intrinsics with overloaded types (e.g., those
+  /// using iAny, fAny, vAny, or pAny).  For a declaration of an overloaded
+  /// intrinsic, Tys must provide exactly one type for each overloaded type in
+  /// the intrinsic.
   LLVM_ABI Function *getOrInsertDeclaration(Module *M, ID id,
-                                            ArrayRef<Type *> OverloadTys = {});
+                                            ArrayRef<Type *> Tys = {});
 
   /// Look up the Function declaration of the intrinsic \p IID in the Module
   /// \p M. If it does not exist, add a declaration and return it. Otherwise,
@@ -131,7 +130,7 @@ namespace Intrinsic {
 
   /// This version supports overloaded intrinsics.
   LLVM_ABI Function *getDeclarationIfExists(Module *M, ID id,
-                                            ArrayRef<Type *> OverloadTys,
+                                            ArrayRef<Type *> Tys,
                                             FunctionType *FT = nullptr);
 
   /// Map a Clang builtin name to an intrinsic ID.
@@ -154,7 +153,6 @@ namespace Intrinsic {
   /// intrinsic. This is returned by getIntrinsicInfoTableEntries.
   struct IITDescriptor {
     enum IITDescriptorKind {
-      // Concrete types. Additional qualifiers listed in comments.
       Void,
       VarArg,
       MMX,
@@ -165,72 +163,69 @@ namespace Intrinsic {
       Float,
       Double,
       Quad,
-      Integer, // Width of the integer in IntegerWidth.
-      Vector,  // Width of the vector in VectorWidth.
-      Pointer, // Address space of the pointer in PointerAddressSpace.
-      Struct,  // Number of elements in StructNumElements.
+      Integer,
+      Vector,
+      Pointer,
+      Struct,
+      Argument,
+      ExtendArgument,
+      TruncArgument,
+      OneNthEltsVecArgument,
+      SameVecWidthArgument,
+      VecOfAnyPtrsToElt,
+      VecElementArgument,
+      Subdivide2Argument,
+      Subdivide4Argument,
+      VecOfBitcastsToInt,
       AMX,
       PPCQuad,
       AArch64Svcount,
-
-      // Overloaded type.
-      Overloaded, // AnyKind and overload index in OverloadInfo.
-
-      // Fully dependent types. Overload index in OverloadInfo.
-      Extend,
-      Trunc,
-      OneNthEltsVec,
-      SameVecWidth,
-      VecElement,
-      Subdivide2,
-      Subdivide4,
-      VecOfBitcastsToInt,
-
-      // Partially dependent types. Overload index (self and of the overload
-      // type it depends on) in OverloadInfo.
-      VecOfAnyPtrsToElt,
-
     } Kind;
 
     union {
       unsigned IntegerWidth;
       unsigned PointerAddressSpace;
       unsigned StructNumElements;
-      unsigned OverloadInfo;
+      unsigned ArgumentInfo;
       ElementCount VectorWidth;
     };
 
     // AK_% : Defined in Intrinsics.td
-    enum AnyKind {
-#define GET_INTRINSIC_ANYKIND
+    enum ArgKind {
+#define GET_INTRINSIC_ARGKIND
 #include "llvm/IR/IntrinsicEnums.inc"
     };
 
-    unsigned getOverloadIndex() const {
-      assert(Kind == Overloaded || Kind == Extend || Kind == Trunc ||
-             Kind == SameVecWidth || Kind == VecElement || Kind == Subdivide2 ||
-             Kind == Subdivide4 || Kind == VecOfBitcastsToInt ||
-             Kind == VecOfAnyPtrsToElt || Kind == OneNthEltsVec);
-      // Overload index is packed into lower 5 bits.
-      return OverloadInfo & 0x1f;
+    unsigned getArgumentNumber() const {
+      assert(Kind == Argument || Kind == ExtendArgument ||
+             Kind == TruncArgument || Kind == SameVecWidthArgument ||
+             Kind == VecElementArgument || Kind == Subdivide2Argument ||
+             Kind == Subdivide4Argument || Kind == VecOfBitcastsToInt);
+      return ArgumentInfo >> 3;
+    }
+    ArgKind getArgumentKind() const {
+      assert(Kind == Argument || Kind == ExtendArgument ||
+             Kind == TruncArgument || Kind == SameVecWidthArgument ||
+             Kind == VecElementArgument || Kind == Subdivide2Argument ||
+             Kind == Subdivide4Argument || Kind == VecOfBitcastsToInt);
+      return (ArgKind)(ArgumentInfo & 7);
     }
 
-    AnyKind getOverloadKind() const {
-      // Overload kind is packed into upper 3 bits.
-      assert(Kind == Overloaded);
-      return (AnyKind)((OverloadInfo >> 5) & 0x7);
+    // VecOfAnyPtrsToElt uses both an overloaded argument (for address space)
+    // and a reference argument (for matching vector width and element types)
+    unsigned getOverloadArgNumber() const {
+      assert(Kind == VecOfAnyPtrsToElt);
+      return ArgumentInfo >> 16;
     }
-
     // OneNthEltsVecArguments uses both a divisor N and a reference argument for
     // the full-width vector to match
     unsigned getVectorDivisor() const {
-      assert(Kind == OneNthEltsVec);
-      return OverloadInfo >> 16;
+      assert(Kind == OneNthEltsVecArgument);
+      return ArgumentInfo >> 16;
     }
-
-    unsigned getRefOverloadIndex() const {
-      assert(Kind == VecOfAnyPtrsToElt);
-      return OverloadInfo >> 16;
+    unsigned getRefArgNumber() const {
+      assert(Kind == VecOfAnyPtrsToElt || Kind == OneNthEltsVecArgument);
+      return ArgumentInfo & 0xFFFF;
     }
 
     static IITDescriptor get(IITDescriptorKind K, unsigned Field) {
@@ -265,13 +260,13 @@ namespace Intrinsic {
 
   /// Match the specified function type with the type constraints specified by
   /// the .td file. If the given type is an overloaded type it is pushed to the
-  /// OverloadTys vector.
+  /// ArgTys vector.
   ///
   /// Returns false if the given type matches with the constraints, true
   /// otherwise.
   LLVM_ABI MatchIntrinsicTypesResult
   matchIntrinsicSignature(FunctionType *FTy, ArrayRef<IITDescriptor> &Infos,
-                          SmallVectorImpl<Type *> &OverloadTys);
+                          SmallVectorImpl<Type *> &ArgTys);
 
   /// Verify if the intrinsic has variable arguments. This method is intended to
   /// be called after all the fixed arguments have been matched first.
@@ -282,16 +277,16 @@ namespace Intrinsic {
 
   /// Gets the type arguments of an intrinsic call by matching type contraints
   /// specified by the .td file. The overloaded types are pushed into the
-  /// OverloadTys vector.
+  /// AgTys vector.
   ///
   /// Returns false if the given ID and function type combination is not a
   /// valid intrinsic call.
   LLVM_ABI bool getIntrinsicSignature(Intrinsic::ID, FunctionType *FT,
-                                      SmallVectorImpl<Type *> &OverloadTys);
+                                      SmallVectorImpl<Type *> &ArgTys);
 
   /// Same as previous, but accepts a Function instead of ID and FunctionType.
   LLVM_ABI bool getIntrinsicSignature(Function *F,
-                                      SmallVectorImpl<Type *> &OverloadTys);
+                                      SmallVectorImpl<Type *> &ArgTys);
 
   // Checks if the intrinsic name matches with its signature and if not
   // returns the declaration with the same signature and remangled name.

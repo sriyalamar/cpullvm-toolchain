@@ -16,5 +16,6 @@
 int foo(int);
 
 void test() {
-  foo(1); // expected-warning-re{{invocation for '{{.+}}diag-simple.cpp' is missing in the invocation list}}
+  // expected-no-diagnostics
+  foo(1); // no-warning. Ignoring "Invocation list file does not contain the requested source file."
 }

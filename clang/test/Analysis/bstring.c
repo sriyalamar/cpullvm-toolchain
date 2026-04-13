@@ -508,8 +508,7 @@ void bcopy2 (void) {
   char src[] = {1, 2, 3, 4};
   char dst[1];
 
-  bcopy(src, dst, 4); // expected-warning {{Memory copy function overflows the destination buffer}}
-  // expected-warning@-1 {{bcopy' will always overflow; destination buffer has size 1, but size argument is 4}}
+  bcopy(src, dst, 4); // expected-warning{{overflow}}
 }
 
 void *malloc(size_t);

@@ -1,10 +1,11 @@
-add_header_library(
-  abort_utils
+add_entrypoint_object(
+  abort
+  SRCS
+    abort.cpp
   HDRS
-    abort_utils.h
+    ../abort.h
   DEPENDS
-    libc.src.__support.OSUtil.linux.syscall_wrappers.raise
-    libc.src.__support.OSUtil.osutil
-    libc.src.signal.linux.__restore
-    libc.src.signal.linux.signal_utils
+    libc.include.stdlib
+    libc.src.signal.raise
+    libc.src.stdlib._Exit
 )

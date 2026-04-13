@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "TableGenBackends.h"
-#include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
 #include "llvm/TableGen/TableGenBackend.h"
 #include <string>
@@ -27,9 +26,6 @@ std::vector<std::string> CXXABILoweringPatternsList;
 std::vector<std::string> CXXABILoweringAttrAlwaysLegal;
 std::vector<std::string> LLVMLoweringPatterns;
 std::vector<std::string> LLVMLoweringPatternsList;
-std::string CIRAttrToValueVisitFunc;
-std::vector<std::string> CIRAttrToValueVisitorCaseTypes;
-std::vector<std::string> CIRAttrToValueVisitorDecls;
 
 struct CustomLoweringCtor {
   struct Param {
@@ -137,8 +133,7 @@ void GenerateABILoweringPattern(llvm::StringRef OpName,
 void GenerateLLVMLoweringPattern(llvm::StringRef OpName,
                                  llvm::StringRef PatternName, bool IsRecursive,
                                  llvm::StringRef ExtraDecl,
-                                 const Record *CustomCtorRec,
-                                 llvm::StringRef LLVMOp) {
+                                 const Record *CustomCtorRec) {
   std::optional<CustomLoweringCtor> CustomCtor =
       parseCustomLoweringCtor(CustomCtorRec);
   std::string CodeBuffer;
@@ -182,24 +177,9 @@ void GenerateLLVMLoweringPattern(llvm::StringRef OpName,
 
   Code << "  }\n\n";
 
-  if (!LLVMOp.empty()) {
-    // Generate the matchAndRewrite body automatically.
-    Code
-        << "  mlir::LogicalResult matchAndRewrite(cir::" << OpName
-        << " op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter) "
-           "const override {\n";
-    Code
-        << "    mlir::Type resTy = typeConverter->convertType(op.getType());\n";
-    Code << "    rewriter.replaceOpWithNewOp<mlir::LLVM::" << LLVMOp
-         << ">(op, resTy, adaptor.getOperands());\n";
-    Code << "    return mlir::success();\n";
-    Code << "  }\n";
-  } else {
-    Code
-        << "  mlir::LogicalResult matchAndRewrite(cir::" << OpName
-        << " op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter) "
-           "const override;\n";
-  }
+  Code << "  mlir::LogicalResult matchAndRewrite(cir::" << OpName
+       << " op, OpAdaptor adaptor, mlir::ConversionPatternRewriter &rewriter) "
+          "const override;\n";
 
   if (!ExtraDecl.empty()) {
     Code << "\nprivate:\n";
@@ -228,16 +208,8 @@ void Generate(const Record *OpRecord) {
     llvm::StringRef ExtraDecl =
         OpRecord->getValueAsString("extraLLVMLoweringPatternDecl");
 
-    llvm::StringRef LLVMOp = OpRecord->getValueAsString("llvmOp");
-
-    if (!LLVMOp.empty() && CustomCtor)
-      PrintFatalError(OpRecord->getLoc(),
-                      "op '" + OpName +
-                          "' has both llvmOp and a custom lowering "
-                          "constructor, which is not supported");
-
     GenerateLLVMLoweringPattern(OpName, PatternName, IsRecursive, ExtraDecl,
-                                CustomCtor, LLVMOp);
+                                CustomCtor);
     // Only automatically register patterns that use the default constructor.
     // Patterns with a custom constructor must be manually registered by the
     // lowering pass.
@@ -252,47 +224,10 @@ void GenerateCIREnumAttrs(const Record *Record) {
   // they never have an 'illegal' CXXABI type in them.
   CXXABILoweringAttrAlwaysLegal.push_back("cir::" + OpName);
 }
-
-void GenerateAttrToValueVisitor(const Record *Rec) {
-  const Record *DialectRec = Rec->getValueAsDef("dialect");
-  llvm::StringRef Ns = DialectRec->getValueAsString("cppNamespace");
-  Ns.consume_front("::");
-  std::string CppClassRef = Ns.str();
-  CppClassRef += "::";
-  CppClassRef += Rec->getValueAsString("cppClassName");
-
-  std::string CodeBuffer;
-  llvm::raw_string_ostream Code(CodeBuffer);
-  Code << "  mlir::Value visitCirAttr(" << CppClassRef << " attr);";
-  CIRAttrToValueVisitorDecls.push_back(std::move(CodeBuffer));
-  CIRAttrToValueVisitorCaseTypes.push_back(std::move(CppClassRef));
-}
-
-void GenerateAttrToValueVisitFunc() {
-  std::string CodeBuffer;
-  llvm::raw_string_ostream Code(CodeBuffer);
-  Code << "  mlir::Value visit(mlir::Attribute attr) {\n"
-       << "    return llvm::TypeSwitch<mlir::Attribute, mlir::Value>(attr)\n"
-       << "        .Case<\n              "
-       << llvm::join(CIRAttrToValueVisitorCaseTypes, ",\n              ")
-       << ">(\n"
-       << "            [&](auto attrT) { return visitCirAttr(attrT); })\n"
-       << "        .Default([this](mlir::Attribute attr) {\n"
-       << "          mlir::emitError(parentOp->getLoc(), \"unsupported CIR "
-          "attribute in LLVM constant lowering\")\n"
-       << "              << attr;\n"
-       << "          return mlir::Value();\n"
-       << "        });\n"
-       << "  }\n";
-  CIRAttrToValueVisitFunc = std::move(CodeBuffer);
-}
-
 void GenerateCIRAttrs(const Record *Record) {
   std::string OpName = GetOpCppClassName(Record);
   if (!Record->getValueAsBit("canHaveIllegalCXXABIType"))
     CXXABILoweringAttrAlwaysLegal.push_back("cir::" + OpName);
-  if (Record->getValueAsBit("hasAttrToValueLowering"))
-    GenerateAttrToValueVisitor(Record);
 }
 } // namespace
 
@@ -305,12 +240,6 @@ void clang::EmitCIRLowering(const llvm::RecordKeeper &RK,
     GenerateCIREnumAttrs(OpRecord);
   for (const auto *OpRecord : RK.getAllDerivedDefinitions("CIR_Attr"))
     GenerateCIRAttrs(OpRecord);
-  GenerateAttrToValueVisitFunc();
-
-  OS << "#ifdef GET_CIR_ATTR_TO_VALUE_VISITOR_DECLS\n"
-     << CIRAttrToValueVisitFunc << "\n"
-     << llvm::join(CIRAttrToValueVisitorDecls, "\n") << "\n"
-     << "#endif // GET_CIR_ATTR_TO_VALUE_VISITOR_DECLS\n\n";
 
   OS << "#ifdef GET_ABI_LOWERING_PATTERNS\n"
      << llvm::join(CXXABILoweringPatterns, "\n") << "#endif\n\n";

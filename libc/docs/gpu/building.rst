@@ -195,7 +195,6 @@ standard runtime build.
   commonly run out of resources if this is not constrained so it is recommended
   to keep it low. The default value is a single thread.
 
-**CMAKE_CROSSCOMPILING_EMULATOR**:STRING
-  Overrides the default loader used for running GPU tests. This is set
-  automatically to ``llvm-gpu-loader`` for GPU runtime targets when building
-  via the runtimes build.
+**LIBC_GPU_LOADER_EXECUTABLE**:STRING
+  Overrides the default loader used for running GPU tests. If this is not
+  provided the standard one will be built.

@@ -105,7 +105,7 @@ TEST_F(SocketTest, CreatePair) {
   };
   for (auto p : erroring_protocols) {
     ASSERT_THAT_EXPECTED(Socket::CreatePair(p),
-                         llvm::FailedWithMessage("unsupported protocol"));
+                         llvm::FailedWithMessage("Unsupported protocol"));
   }
 }
 

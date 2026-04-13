@@ -264,9 +264,10 @@ bool ObjectFileJSON::SetLoadAddress(Target &target, lldb::addr_t value,
   for (const SectionSP &section_sp : *m_sections_up) {
     addr_t section_load_addr = section_sp->GetFileAddress();
     if (section_load_addr != LLDB_INVALID_ADDRESS) {
-      LLDB_LOG(log,
-               "ObjectFileJSON::SetLoadAddress section {0} to load addr {1:x}",
-               section_sp->GetName(), section_load_addr + slide);
+      LLDB_LOGF(
+          log,
+          "ObjectFileJSON::SetLoadAddress section %s to load addr 0x%" PRIx64,
+          section_sp->GetName().AsCString(), section_load_addr + slide);
       target.SetSectionLoadAddress(section_sp, section_load_addr + slide,
                                    /*warn_multiple=*/true);
     }

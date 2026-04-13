@@ -16,5 +16,6 @@
 int foo(int);
 
 void test() {
-  foo(1); // expected-warning-re{{imported AST from '{{.+}}simple.cpp' had been generated for a different language, current: C++14, imported: C++17}}
+  // expected-no-diagnostics
+  foo(1); // no-warning. Ignoring "Invocation list file contains multiple references to the same source file."
 }

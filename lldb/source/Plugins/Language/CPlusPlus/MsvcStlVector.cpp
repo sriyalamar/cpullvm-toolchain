@@ -10,7 +10,6 @@
 
 #include "lldb/DataFormatters/FormattersHelpers.h"
 #include "lldb/DataFormatters/TypeSynthetic.h"
-#include "llvm/Support/ErrorExtras.h"
 
 using namespace lldb;
 
@@ -139,10 +138,12 @@ lldb_private::formatters::MsvcStlVectorSyntheticFrontEnd::Update() {
 llvm::Expected<size_t> lldb_private::formatters::
     MsvcStlVectorSyntheticFrontEnd::GetIndexOfChildWithName(ConstString name) {
   if (!m_start || !m_finish)
-    return llvm::createStringErrorV("type has no child named '{0}'", name);
+    return llvm::createStringError("Type has no child named '%s'",
+                                   name.AsCString());
   auto optional_idx = ExtractIndexFromString(name.GetCString());
   if (!optional_idx) {
-    return llvm::createStringErrorV("type has no child named '{0}'", name);
+    return llvm::createStringError("Type has no child named '%s'",
+                                   name.AsCString());
   }
   return *optional_idx;
 }
@@ -266,14 +267,17 @@ llvm::Expected<size_t>
 lldb_private::formatters::MsvcStlVectorBoolSyntheticFrontEnd::
     GetIndexOfChildWithName(ConstString name) {
   if (!m_count || !m_base_data_address)
-    return llvm::createStringErrorV("type has no child named '{0}'", name);
-  auto optional_idx = ExtractIndexFromString(name.AsCString(nullptr));
+    return llvm::createStringError("Type has no child named '%s'",
+                                   name.AsCString());
+  auto optional_idx = ExtractIndexFromString(name.AsCString());
   if (!optional_idx) {
-    return llvm::createStringErrorV("type has no child named '{0}'", name);
+    return llvm::createStringError("Type has no child named '%s'",
+                                   name.AsCString());
   }
   uint32_t idx = *optional_idx;
   if (idx >= CalculateNumChildrenIgnoringErrors())
-    return llvm::createStringErrorV("type has no child named '{0}'", name);
+    return llvm::createStringError("Type has no child named '%s'",
+                                   name.AsCString());
   return idx;
 }
 

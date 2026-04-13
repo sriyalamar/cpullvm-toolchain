@@ -24,8 +24,7 @@ namespace {
 
 /// Implement the interface to convert Func to EmitC.
 struct FuncToEmitCDialectInterface : public ConvertToEmitCPatternInterface {
-  FuncToEmitCDialectInterface(Dialect *dialect)
-      : ConvertToEmitCPatternInterface(dialect) {}
+  using ConvertToEmitCPatternInterface::ConvertToEmitCPatternInterface;
 
   /// Hook for derived dialect interface to provide conversion patterns
   /// and mark dialect legal for the conversion target.

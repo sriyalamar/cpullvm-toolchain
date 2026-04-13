@@ -108,9 +108,6 @@ intrinsicToAttrMask(Intrinsic::ID ID, bool &NonKernelOnly, bool &NeedsImplicit,
     // offsets.
     return CodeObjectVersion >= AMDGPU::AMDHSA_COV5 ? IMPLICIT_ARG_PTR
                                                     : QUEUE_PTR;
-  case Intrinsic::amdgcn_wwm:
-  case Intrinsic::amdgcn_strict_wwm:
-    return WHOLE_WAVE_MODE;
   case Intrinsic::trap:
   case Intrinsic::debugtrap:
   case Intrinsic::ubsantrap:
@@ -1662,7 +1659,7 @@ PreservedAnalyses llvm::AMDGPUAttributorPass::run(Module &M,
 
   SetVector<Function *> Functions;
   for (Function &F : M) {
-    if (!F.isDeclaration())
+    if (!F.isIntrinsic())
       Functions.insert(&F);
   }
 
