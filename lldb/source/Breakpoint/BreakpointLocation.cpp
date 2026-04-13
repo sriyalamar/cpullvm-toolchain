@@ -618,7 +618,7 @@ void BreakpointLocation::GetDescription(Stream *s,
                   sc.function->GetMangled().GetMangledName()) {
             s->EOL();
             s->Indent("mangled function = ");
-            s->PutCString(mangled_name);
+            s->PutCString(mangled_name.AsCString());
           }
         }
 

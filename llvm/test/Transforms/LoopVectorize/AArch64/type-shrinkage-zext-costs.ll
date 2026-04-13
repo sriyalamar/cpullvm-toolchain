@@ -8,7 +8,6 @@ target triple = "aarch64-unknown-linux-gnu"
 
 define void @zext_i8_i16(ptr noalias nocapture readonly %p, ptr noalias nocapture %q, i32 %len) #0 {
 ; CHECK-COST-LABEL: LV: Checking a loop in 'zext_i8_i16'
-; CHECK-COST: LV: Found an estimated cost of 0 for VF 1 For instruction:   %conv = zext i8 %0 to i32
 ; CHECK-COST: Cost of 1 for VF 2: WIDEN-CAST ir<%conv> = zext ir<%0> to i16
 ; CHECK-COST: Cost of 1 for VF 4: WIDEN-CAST ir<%conv> = zext ir<%0> to i16
 ; CHECK-COST: Cost of 1 for VF 8: WIDEN-CAST ir<%conv> = zext ir<%0> to i16
@@ -17,6 +16,7 @@ define void @zext_i8_i16(ptr noalias nocapture readonly %p, ptr noalias nocaptur
 ; CHECK-COST: Cost of 1 for VF vscale x 2: WIDEN-CAST ir<%conv> = zext ir<%0> to i16
 ; CHECK-COST: Cost of 1 for VF vscale x 4: WIDEN-CAST ir<%conv> = zext ir<%0> to i16
 ; CHECK-COST: Cost of 0 for VF vscale x 8: WIDEN-CAST ir<%conv> = zext ir<%0> to i16
+; CHECK-COST: LV: Found an estimated cost of 0 for VF 1 For instruction:   %conv = zext i8 %0 to i32
 ; CHECK-LABEL: define void @zext_i8_i16
 ; CHECK-SAME: (ptr noalias readonly captures(none) [[P:%.*]], ptr noalias captures(none) [[Q:%.*]], i32 [[LEN:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  entry:

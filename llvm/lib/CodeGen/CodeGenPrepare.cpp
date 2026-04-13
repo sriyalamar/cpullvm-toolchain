@@ -7968,12 +7968,17 @@ bool CodeGenPrepare::tryToSinkFreeOperands(Instruction *I) {
   bool Changed = false;
   SmallVector<Use *, 4> ToReplace;
   Instruction *InsertPoint = I;
+  DenseMap<const Instruction *, unsigned long> InstOrdering;
+  unsigned long InstNumber = 0;
+  for (const auto &I : *TargetBB)
+    InstOrdering[&I] = InstNumber++;
+
   for (Use *U : reverse(OpsToSink)) {
     auto *UI = cast<Instruction>(U->get());
     if (isa<PHINode>(UI) || UI->mayHaveSideEffects() || UI->mayReadFromMemory())
       continue;
     if (UI->getParent() == TargetBB) {
-      if (UI->comesBefore(InsertPoint))
+      if (InstOrdering[UI] < InstOrdering[InsertPoint])
         InsertPoint = UI;
       continue;
     }

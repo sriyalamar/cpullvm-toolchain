@@ -931,7 +931,7 @@ void ClangASTSource::FindObjCMethodDecls(NameSearchContext &context) {
 
   do {
     StreamString ms;
-    ms.Format("-[{0} {1}]", interface_name, selector_name);
+    ms.Printf("-[%s %s]", interface_name.c_str(), selector_name.AsCString());
     ms.Flush();
     ConstString instance_method_name(ms.GetString());
 
@@ -944,7 +944,7 @@ void ClangASTSource::FindObjCMethodDecls(NameSearchContext &context) {
       break;
 
     ms.Clear();
-    ms.Format("+[{0} {1}]", interface_name, selector_name);
+    ms.Printf("+[%s %s]", interface_name.c_str(), selector_name.AsCString());
     ms.Flush();
     ConstString class_method_name(ms.GetString());
 
@@ -970,8 +970,7 @@ void ClangASTSource::FindObjCMethodDecls(NameSearchContext &context) {
       if (!candidate_sc.function)
         continue;
 
-      const char *candidate_name =
-          candidate_sc.function->GetName().AsCString(nullptr);
+      const char *candidate_name = candidate_sc.function->GetName().AsCString();
 
       const char *cursor = candidate_name;
 

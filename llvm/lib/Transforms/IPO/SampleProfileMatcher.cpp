@@ -187,7 +187,6 @@ bool SampleProfileMatcher::isProfileUnused(const FunctionId &ProfileFuncName) {
   // module. Check if the function name exists in the pseudo_probe descriptors.
   return (SymbolMap->find(ProfileFuncName) == SymbolMap->end()) &&
          (LTOPhase == ThinOrFullLTOPhase::ThinLTOPreLink ||
-          !FunctionSamples::ProfileIsProbeBased ||
           !ProfileFuncName.isStringRef() ||
           (ProbeManager->getDesc(ProfileFuncName.stringRef()) == nullptr));
 }
@@ -235,12 +234,10 @@ SampleProfileMatcher::longestCommonSequence(const AnchorList &AnchorList1,
 void SampleProfileMatcher::matchNonCallsiteLocs(
     const LocToLocMap &MatchedAnchors, const AnchorMap &IRAnchors,
     LocToLocMap &IRToProfileLocationMap) {
-  auto UpdateMatching = [&](const LineLocation &From, const LineLocation &To) {
+  auto InsertMatching = [&](const LineLocation &From, const LineLocation &To) {
     // Skip the unchanged location mapping to save memory.
     if (From != To)
-      IRToProfileLocationMap.insert_or_assign(From, To);
-    else
-      IRToProfileLocationMap.erase(From);
+      IRToProfileLocationMap.insert({From, To});
   };
 
   // Use function's beginning location as the initial anchor.
@@ -253,7 +250,7 @@ void SampleProfileMatcher::matchNonCallsiteLocs(
     auto R = MatchedAnchors.find(Loc);
     if (R != MatchedAnchors.end()) {
       const auto &Candidate = R->second;
-      UpdateMatching(Loc, Candidate);
+      InsertMatching(Loc, Candidate);
       LLVM_DEBUG(dbgs() << "Callsite with callee:" << IR.second.stringRef()
                         << " is matched from " << Loc << " to " << Candidate
                         << "\n");
@@ -261,14 +258,14 @@ void SampleProfileMatcher::matchNonCallsiteLocs(
 
       // Match backwards for non-anchor locations.
       // The locations in LastMatchedNonAnchors have been matched forwards
-      // based on the previous anchor, split it evenly and overwrite the
+      // based on the previous anchor, spilt it evenly and overwrite the
       // second half based on the current anchor.
       for (size_t I = (LastMatchedNonAnchors.size() + 1) / 2;
            I < LastMatchedNonAnchors.size(); I++) {
         const auto &L = LastMatchedNonAnchors[I];
         uint32_t CandidateLineOffset = L.LineOffset + LocationDelta;
         LineLocation Candidate(CandidateLineOffset, L.Discriminator);
-        UpdateMatching(L, Candidate);
+        InsertMatching(L, Candidate);
         LLVM_DEBUG(dbgs() << "Location is rematched backwards from " << L
                           << " to " << Candidate << "\n");
       }
@@ -281,7 +278,7 @@ void SampleProfileMatcher::matchNonCallsiteLocs(
     if (!IsMatchedAnchor) {
       uint32_t CandidateLineOffset = Loc.LineOffset + LocationDelta;
       LineLocation Candidate(CandidateLineOffset, Loc.Discriminator);
-      UpdateMatching(Loc, Candidate);
+      InsertMatching(Loc, Candidate);
       LLVM_DEBUG(dbgs() << "Location is matched from " << Loc << " to "
                         << Candidate << "\n");
       LastMatchedNonAnchors.emplace_back(Loc);
@@ -427,7 +424,7 @@ void SampleProfileMatcher::runOnFunction(Function &F) {
 
   // The matching result will be saved to IRToProfileLocationMap, create a
   // new map for each function.
-  auto &IRToProfileLocationMap = getIRToProfileLocationMap(*FSForMatching);
+  auto &IRToProfileLocationMap = getIRToProfileLocationMap(F);
   runStaleProfileMatching(F, IRAnchors, ProfileAnchors, IRToProfileLocationMap,
                           RunCFGMatching, RunCGMatching);
   // Find and update callsite match states after matching.

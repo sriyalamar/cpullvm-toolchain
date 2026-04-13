@@ -595,11 +595,11 @@ public:
                                                  SmallVectorImpl<
                                                    PartialDiagnosticAt> &Diags);
 
-  /// Returns true if this expression can be emitted to
+  /// isConstantInitializer - Returns true if this expression can be emitted to
   /// IR as a constant, and thus can be used as a constant initializer in C.
   /// If this expression is not constant and Culprit is non-null,
   /// it is used to store the address of first non constant expr.
-  bool isConstantInitializer(ASTContext &Ctx, bool ForRef = false,
+  bool isConstantInitializer(ASTContext &Ctx, bool ForRef,
                              const Expr **Culprit = nullptr) const;
 
   /// If this expression is an unambiguous reference to a single declaration,

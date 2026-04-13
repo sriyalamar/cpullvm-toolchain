@@ -60,7 +60,7 @@ std::optional<std::string> getRelativeIncludeName(const CompilerInstance &CI,
                                                   StringRef File,
                                                   bool *IsQuoted = nullptr) {
   assert(CI.hasFileManager() &&
-         "CompilerInstance does not have a FileManager!");
+         "CompilerInstance does not have a FileNamager!");
 
   using namespace llvm::sys;
   const auto &FS = CI.getVirtualFileSystem();

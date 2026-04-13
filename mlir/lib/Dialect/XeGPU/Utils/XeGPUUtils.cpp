@@ -879,7 +879,7 @@ template int
 xegpu::getLargestDivisor<unsigned>(unsigned dim, ArrayRef<unsigned> candidates,
                                    ArrayRef<unsigned> candidateMultiples);
 
-bool xegpu::requirePacked(const xegpu::DistributeLayoutAttr layout) {
+bool xegpu::requirePacked(const xegpu::LayoutAttr layout) {
   if (!layout)
     return false;
   auto laneData = layout.getEffectiveLaneDataAsInt();
@@ -888,7 +888,7 @@ bool xegpu::requirePacked(const xegpu::DistributeLayoutAttr layout) {
   return laneData[0] != 1;
 }
 
-bool xegpu::requireTranspose(const xegpu::DistributeLayoutAttr layout,
+bool xegpu::requireTranspose(const xegpu::LayoutAttr layout,
                              const xegpu::uArch::uArch *uArch) {
   // Return false for unsupported targets.
   // TODO: Add more support or move to target info.

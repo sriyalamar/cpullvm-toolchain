@@ -81,7 +81,7 @@ SBProcess::~SBProcess() = default;
 const char *SBProcess::GetBroadcasterClassName() {
   LLDB_INSTRUMENT();
 
-  return ConstString(Process::GetStaticBroadcasterClass()).AsCString(nullptr);
+  return ConstString(Process::GetStaticBroadcasterClass()).AsCString();
 }
 
 const char *SBProcess::GetPluginName() {
@@ -824,7 +824,7 @@ SBBroadcaster SBProcess::GetBroadcaster() const {
 const char *SBProcess::GetBroadcasterClass() {
   LLDB_INSTRUMENT();
 
-  return ConstString(Process::GetStaticBroadcasterClass()).AsCString(nullptr);
+  return ConstString(Process::GetStaticBroadcasterClass()).AsCString();
 }
 
 lldb::SBAddressRangeList SBProcess::FindRangesInMemory(
@@ -1014,7 +1014,7 @@ bool SBProcess::GetDescription(SBStream &description) {
     Module *exe_module = process_sp->GetTarget().GetExecutableModulePointer();
     const char *exe_name = nullptr;
     if (exe_module)
-      exe_name = exe_module->GetFileSpec().GetFilename().AsCString(nullptr);
+      exe_name = exe_module->GetFileSpec().GetFilename().AsCString();
 
     strm.Printf("SBProcess: pid = %" PRIu64 ", state = %s, threads = %d%s%s",
                 process_sp->GetID(), lldb_private::StateAsCString(GetState()),
@@ -1196,7 +1196,7 @@ const char *SBProcess::GetExtendedBacktraceTypeAtIndex(uint32_t idx) {
     const std::vector<ConstString> &names =
         runtime->GetExtendedBacktraceTypes();
     if (idx < names.size()) {
-      return names[idx].AsCString(nullptr);
+      return names[idx].AsCString();
     }
   }
   return nullptr;

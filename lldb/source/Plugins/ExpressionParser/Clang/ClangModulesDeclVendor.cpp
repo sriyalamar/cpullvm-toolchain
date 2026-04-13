@@ -338,8 +338,8 @@ ClangModulesDeclVendorImpl::AddModule(const SourceModule &module,
   }
 
   if (!HS.lookupModule(module.path.front().GetStringRef()))
-    return llvm::createStringErrorV(
-        "header search couldn't locate module '{0}'", module.path.front());
+    return llvm::createStringError("header search couldn't locate module '%s'",
+                                   module.path.front().AsCString());
 
   llvm::SmallVector<clang::IdentifierLoc, 4> clang_path;
 

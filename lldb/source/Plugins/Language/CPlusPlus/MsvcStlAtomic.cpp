@@ -9,7 +9,6 @@
 #include "MsvcStl.h"
 
 #include "lldb/DataFormatters/TypeSynthetic.h"
-#include "llvm/Support/ErrorExtras.h"
 
 using namespace lldb;
 
@@ -86,7 +85,8 @@ llvm::Expected<size_t> lldb_private::formatters::
     MsvcStlAtomicSyntheticFrontEnd::GetIndexOfChildWithName(ConstString name) {
   if (name == "Value")
     return 0;
-  return llvm::createStringErrorV("type has no child named '{0}'", name);
+  return llvm::createStringError("Type has no child named '%s'",
+                                 name.AsCString());
 }
 
 lldb_private::SyntheticChildrenFrontEnd *

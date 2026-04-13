@@ -210,23 +210,23 @@ static Instruction *convertNvvmIntrinsicToLlvm(InstCombiner &IC,
     case Intrinsic::nvvm_fma_rn_bf16x2:
       return {Intrinsic::fma, FTZ_MustBeOff, true};
     case Intrinsic::nvvm_fmax_d:
-      return {Intrinsic::maximumnum, FTZ_Any};
+      return {Intrinsic::maxnum, FTZ_Any};
     case Intrinsic::nvvm_fmax_f:
-      return {Intrinsic::maximumnum, FTZ_MustBeOff};
+      return {Intrinsic::maxnum, FTZ_MustBeOff};
     case Intrinsic::nvvm_fmax_ftz_f:
-      return {Intrinsic::maximumnum, FTZ_MustBeOn};
+      return {Intrinsic::maxnum, FTZ_MustBeOn};
     case Intrinsic::nvvm_fmax_nan_f:
       return {Intrinsic::maximum, FTZ_MustBeOff};
     case Intrinsic::nvvm_fmax_ftz_nan_f:
       return {Intrinsic::maximum, FTZ_MustBeOn};
     case Intrinsic::nvvm_fmax_f16:
-      return {Intrinsic::maximumnum, FTZ_MustBeOff, true};
+      return {Intrinsic::maxnum, FTZ_MustBeOff, true};
     case Intrinsic::nvvm_fmax_ftz_f16:
-      return {Intrinsic::maximumnum, FTZ_MustBeOn, true};
+      return {Intrinsic::maxnum, FTZ_MustBeOn, true};
     case Intrinsic::nvvm_fmax_f16x2:
-      return {Intrinsic::maximumnum, FTZ_MustBeOff, true};
+      return {Intrinsic::maxnum, FTZ_MustBeOff, true};
     case Intrinsic::nvvm_fmax_ftz_f16x2:
-      return {Intrinsic::maximumnum, FTZ_MustBeOn, true};
+      return {Intrinsic::maxnum, FTZ_MustBeOn, true};
     case Intrinsic::nvvm_fmax_nan_f16:
       return {Intrinsic::maximum, FTZ_MustBeOff, true};
     case Intrinsic::nvvm_fmax_ftz_nan_f16:
@@ -236,23 +236,23 @@ static Instruction *convertNvvmIntrinsicToLlvm(InstCombiner &IC,
     case Intrinsic::nvvm_fmax_ftz_nan_f16x2:
       return {Intrinsic::maximum, FTZ_MustBeOn, true};
     case Intrinsic::nvvm_fmin_d:
-      return {Intrinsic::minimumnum, FTZ_Any};
+      return {Intrinsic::minnum, FTZ_Any};
     case Intrinsic::nvvm_fmin_f:
-      return {Intrinsic::minimumnum, FTZ_MustBeOff};
+      return {Intrinsic::minnum, FTZ_MustBeOff};
     case Intrinsic::nvvm_fmin_ftz_f:
-      return {Intrinsic::minimumnum, FTZ_MustBeOn};
+      return {Intrinsic::minnum, FTZ_MustBeOn};
     case Intrinsic::nvvm_fmin_nan_f:
       return {Intrinsic::minimum, FTZ_MustBeOff};
     case Intrinsic::nvvm_fmin_ftz_nan_f:
       return {Intrinsic::minimum, FTZ_MustBeOn};
     case Intrinsic::nvvm_fmin_f16:
-      return {Intrinsic::minimumnum, FTZ_MustBeOff, true};
+      return {Intrinsic::minnum, FTZ_MustBeOff, true};
     case Intrinsic::nvvm_fmin_ftz_f16:
-      return {Intrinsic::minimumnum, FTZ_MustBeOn, true};
+      return {Intrinsic::minnum, FTZ_MustBeOn, true};
     case Intrinsic::nvvm_fmin_f16x2:
-      return {Intrinsic::minimumnum, FTZ_MustBeOff, true};
+      return {Intrinsic::minnum, FTZ_MustBeOff, true};
     case Intrinsic::nvvm_fmin_ftz_f16x2:
-      return {Intrinsic::minimumnum, FTZ_MustBeOn, true};
+      return {Intrinsic::minnum, FTZ_MustBeOn, true};
     case Intrinsic::nvvm_fmin_nan_f16:
       return {Intrinsic::minimum, FTZ_MustBeOff, true};
     case Intrinsic::nvvm_fmin_ftz_nan_f16:
@@ -671,9 +671,10 @@ void NVPTXTTIImpl::collectKernelLaunchBounds(
     LB.push_back({"maxntidz", MaxNTID[2]});
 }
 
-ValueUniformity NVPTXTTIImpl::getValueUniformity(const Value *V) const {
+InstructionUniformity
+NVPTXTTIImpl::getInstructionUniformity(const Value *V) const {
   if (isSourceOfDivergence(V))
-    return ValueUniformity::NeverUniform;
+    return InstructionUniformity::NeverUniform;
 
-  return ValueUniformity::Default;
+  return InstructionUniformity::Default;
 }

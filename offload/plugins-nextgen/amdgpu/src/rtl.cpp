@@ -212,22 +212,11 @@ static Error getTargetTripleAndFeatures(hsa_agent_t Agent,
     if (Status != HSA_STATUS_SUCCESS)
       return Status;
 
-    // The format returned here is a partially malformed triple, e.g.,
-    // "amdgcn-amd-amdhsa--gfx90a", or
-    // "amdgcn-amd-amdhsa--gfx90a:sramecc+:xnack-". The subtarget is in the
-    // position that is supposed to be the object format. Reconstitute the valid
-    // part of the triple for parsing, and take the appended subtarget name.
-    SmallVector<StringRef, 5> Components;
-
-    llvm::StringRef TripleLikeStr(ISAName.data(), ISAName.size() - 1);
-    TripleLikeStr.split(Components, '-', /*MaxSplit=*/4);
-
-    if (Components.size() == 5) {
-      llvm::Triple TripleTarget(Components[0], Components[1], Components[2]);
-      if (TripleTarget.isAMDGCN() && TripleTarget.getOS() == Triple::AMDHSA)
-        Targets.emplace_back(Components[4]);
+    llvm::StringRef TripleTarget(ISAName.begin(), Length);
+    if (TripleTarget.consume_front("amdgcn-amd-amdhsa")) {
+      auto Target = TripleTarget.ltrim('-').rtrim('\0');
+      Targets.push_back(Target);
     }
-
     return HSA_STATUS_SUCCESS;
   });
   return Err;
@@ -701,14 +690,11 @@ struct AMDGPUSignalTy {
   /// plugin thread or the HSA runtime.
   void reset() { hsa_signal_store_screlease(HSASignal, 1); }
 
-  /// Increase the number of concurrent uses by \p Amount.
-  void increaseUseCount(uint32_t Amount = 1) { UseCount.increase(Amount); }
+  /// Increase the number of concurrent uses.
+  void increaseUseCount() { UseCount.increase(); }
 
-  /// Decrease the number of concurrent uses by \p Amount and return whether it
-  /// became zero.
-  bool decreaseUseCount(uint32_t Amount = 1) {
-    return UseCount.decrease(Amount);
-  }
+  /// Decrease the number of concurrent uses and return whether was the last.
+  bool decreaseUseCount() { return UseCount.decrease(); }
 
   hsa_signal_t get() const { return HSASignal; }
 
@@ -718,7 +704,7 @@ private:
 
   /// Reference counter for tracking the concurrent use count. This is mainly
   /// used for knowing how many streams are using the signal.
-  RefCountTy<uint32_t> UseCount;
+  RefCountTy<> UseCount;
 };
 
 /// Classes for holding AMDGPU signals and managing signals.
@@ -734,22 +720,10 @@ struct AMDGPUQueueTy {
   Error init(GenericDeviceTy &Device, hsa_agent_t Agent, int32_t QueueSize) {
     if (Queue)
       return Plugin::success();
-
     hsa_status_t Status =
         hsa_queue_create(Agent, QueueSize, HSA_QUEUE_TYPE_MULTI, callbackError,
                          &Device, UINT32_MAX, UINT32_MAX, &Queue);
-    if (auto Err = Plugin::check(Status, "error in hsa_queue_create: %s"))
-      return Err;
-
-    // Enable queue profiling from creation time onward, as HIP/ROCclr does.
-    // Elapsed-time queries rely on queue-level hardware profiling support to
-    // retrieve packet timing.
-    Status = hsa_amd_profiling_set_profiler_enabled(Queue, 1);
-    if (auto Err = Plugin::check(
-            Status, "error in hsa_amd_profiling_set_profiler_enabled: %s"))
-      return Err;
-
-    return Plugin::success();
+    return Plugin::check(Status, "error in hsa_queue_create: %s");
   }
 
   /// Deinitialize the queue and destroy its resources.
@@ -1168,18 +1142,6 @@ private:
     Slots[Curr].Signal = OutputSignal;
 
     return {Curr, InputSignal};
-  }
-
-  /// Roll back the last consumed slot after a submission failure so the stream
-  /// does not retain a slot for an operation that was never enqueued.
-  void rollbackConsumedSlot(uint32_t Slot) {
-    assert(NextSlot > 0 && "Cannot roll back an empty stream");
-    assert(Slot + 1 == NextSlot && "Can only roll back the last consumed slot");
-
-    Slots[Slot].Signal = nullptr;
-    Slots[Slot].Callbacks.clear();
-    Slots[Slot].ActionArgs.clear();
-    --NextSlot;
   }
 
   /// Complete all pending post actions and reset the stream after synchronizing
@@ -1681,9 +1643,8 @@ public:
 
   const AMDGPUQueueTy *getQueue() const { return Queue; }
 
-  /// Record an event by enqueuing a barrier marker packet on the stream.
-  Error recordEvent(AMDGPUEventTy &Event,
-                    AMDGPUSignalTy *ReusedSignal = nullptr);
+  /// Record the state of the stream on an event.
+  Error recordEvent(AMDGPUEventTy &Event) const;
 
   /// Make the stream wait on an event.
   Error waitEvent(const AMDGPUEventTy &Event);
@@ -1691,46 +1652,25 @@ public:
   friend struct AMDGPUStreamManagerTy;
 };
 
-/// Class representing an event on AMDGPU. The event stores the recorded stream
-/// point and retained timing state.
+/// Class representing an event on AMDGPU. The event basically stores some
+/// information regarding the state of the recorded stream.
 struct AMDGPUEventTy {
   /// Create an empty event.
   AMDGPUEventTy(AMDGPUDeviceTy &Device)
-      : Device(Device), RecordedStream(nullptr), RecordedSlot(-1),
-        RecordedSyncCycle(-1), TimingSignal(nullptr) {}
+      : RecordedStream(nullptr), RecordedSlot(-1), RecordedSyncCycle(-1) {}
 
   /// Initialize and deinitialize.
-  Error init() { return resetState(); }
-  Error deinit() { return resetState(); }
+  Error init() { return Plugin::success(); }
+  Error deinit() { return Plugin::success(); }
 
-  /// Clear the current recording and retained timing state, optionally
-  /// returning a reusable timing signal.
-  Error resetState(AMDGPUSignalTy **ReusableSignalPtr = nullptr) {
-    RecordedStream = nullptr;
-    RecordedSlot = -1;
-    RecordedSyncCycle = -1;
-    return releaseTimingSignal(ReusableSignalPtr);
-  }
-
-  /// Record the current stream point on the event.
+  /// Record the state of a stream on the event.
   Error record(AMDGPUStreamTy &Stream) {
     std::lock_guard<std::mutex> Lock(Mutex);
 
-    // Discard the previous recording and retained timing state, reusing the
-    // retained timing signal if it becomes available.
-    AMDGPUSignalTy *Signal = nullptr;
-    if (auto Err = resetState(&Signal))
-      return Err;
-
+    // Ignore the last recorded stream.
     RecordedStream = &Stream;
 
-    if (auto Err = Stream.recordEvent(*this, Signal)) {
-      if (auto ResetErr = resetState())
-        return joinErrors(std::move(Err), std::move(ResetErr));
-      return Err;
-    }
-
-    return Plugin::success();
+    return Stream.recordEvent(*this);
   }
 
   /// Make a stream wait on the current event.
@@ -1768,28 +1708,15 @@ struct AMDGPUEventTy {
     return RecordedStream->synchronizeOn(*this);
   }
 
-  /// Return the elapsed time in milliseconds between this event and EndEvent.
-  Expected<float> getElapsedTime(AMDGPUEventTy &EndEvent);
-
 protected:
-  /// Release the retained timing signal, if any, either back to the signal
-  /// manager or through \p ReusableSignalPtr when provided.
-  Error releaseTimingSignal(AMDGPUSignalTy **ReusableSignalPtr = nullptr);
-
-  /// The device that owns this event.
-  AMDGPUDeviceTy &Device;
-
   /// The stream registered in this event.
   AMDGPUStreamTy *RecordedStream;
 
-  /// The recorded operation on the recorded stream.
+  /// The recordered operation on the recorded stream.
   int64_t RecordedSlot;
 
   /// The sync cycle when the stream was recorded. Used to detect stale events.
   int64_t RecordedSyncCycle;
-
-  /// The signal of the recorded timing barrier.
-  AMDGPUSignalTy *TimingSignal;
 
   /// Mutex to safely access event fields.
   mutable std::mutex Mutex;
@@ -1797,50 +1724,22 @@ protected:
   friend struct AMDGPUStreamTy;
 };
 
-Error AMDGPUStreamTy::recordEvent(AMDGPUEventTy &Event,
-                                  AMDGPUSignalTy *ReusedSignal) {
-  if (Queue == nullptr)
-    return Plugin::error(ErrorCode::INVALID_NULL_POINTER,
-                         "target queue was nullptr");
+Error AMDGPUStreamTy::recordEvent(AMDGPUEventTy &Event) const {
+  std::lock_guard<std::mutex> Lock(Mutex);
 
-  // One use for the stream slot and one for the event timing signal.
-  const uint32_t OutputSignalUses = 2;
+  if (size() > 0) {
+    // Record the synchronize identifier (to detect stale recordings) and
+    // the last valid stream's operation.
+    Event.RecordedSyncCycle = SyncCycle;
+    Event.RecordedSlot = last();
 
-  // Reuse the provided signal or retrieve one for the operation's output.
-  AMDGPUSignalTy *OutputSignal = ReusedSignal;
-  if (!OutputSignal) {
-    if (auto Err = SignalManager.getResource(OutputSignal))
-      return Err;
+    assert(Event.RecordedSyncCycle >= 0 && "Invalid recorded sync cycle");
+    assert(Event.RecordedSlot >= 0 && "Invalid recorded slot");
+  } else {
+    // The stream is empty, everything already completed, record nothing.
+    Event.RecordedSyncCycle = -1;
+    Event.RecordedSlot = -1;
   }
-
-  OutputSignal->reset();
-  OutputSignal->increaseUseCount(OutputSignalUses);
-
-  std::lock_guard<std::mutex> StreamLock(Mutex);
-
-  // Consume stream slot and compute dependencies.
-  auto [Curr, InputSignal] = consume(OutputSignal);
-
-  // Materialize the event as a real marker on the queue. Elapsed-time queries
-  // need a packet-backed completion signal to retrieve dispatch timing.
-  if (auto Err = Queue->pushBarrier(OutputSignal, InputSignal, nullptr)) {
-    rollbackConsumedSlot(Curr);
-
-    if (OutputSignal->decreaseUseCount(OutputSignalUses)) {
-      if (auto ReturnErr = SignalManager.returnResource(OutputSignal))
-        return joinErrors(std::move(Err), std::move(ReturnErr));
-    }
-
-    return Err;
-  }
-
-  Event.RecordedSlot = Curr;
-  Event.RecordedSyncCycle = SyncCycle;
-  Event.TimingSignal = OutputSignal;
-
-  assert(Event.RecordedSyncCycle >= 0 && "Invalid recorded sync cycle");
-  assert(Event.RecordedSlot >= 0 && "Invalid recorded slot");
-
   return Plugin::success();
 }
 
@@ -2225,12 +2124,6 @@ struct AMDGPUDeviceTy : public GenericDeviceTy, AMDGenericDeviceTy {
                          ClockFrequency) != HSA_STATUS_SUCCESS)
       ClockFrequency = 0;
 
-    // Retrieve the HSA system timestamp frequency for this runtime. A zero
-    // value means the frequency is unavailable.
-    if (hsa_system_get_info(HSA_SYSTEM_INFO_TIMESTAMP_FREQUENCY,
-                            &SystemTimestampFrequency) != HSA_STATUS_SUCCESS)
-      SystemTimestampFrequency = 0;
-
     // Load the grid values depending on the wavefront.
     if (WavefrontSize == 32)
       GridValues = getAMDGPUGridValues<32>();
@@ -2439,11 +2332,6 @@ struct AMDGPUDeviceTy : public GenericDeviceTy, AMDGenericDeviceTy {
 
   /// Returns the clock frequency for the given AMDGPU device.
   uint64_t getClockFrequency() const override { return ClockFrequency; }
-
-  /// Returns the HSA system timestamp frequency. Zero means unavailable.
-  uint64_t getSystemTimestampFrequency() const {
-    return SystemTimestampFrequency;
-  }
 
   /// Allocate and construct an AMDGPU kernel.
   Expected<GenericKernelTy &> constructKernel(const char *Name) override {
@@ -2925,19 +2813,12 @@ struct AMDGPUDeviceTy : public GenericDeviceTy, AMDGenericDeviceTy {
   /// Create an event.
   Error createEventImpl(void **EventPtrStorage) override {
     AMDGPUEventTy **Event = reinterpret_cast<AMDGPUEventTy **>(EventPtrStorage);
-    if (auto Err = AMDGPUEventManager.getResource(*Event))
-      return Err;
-    return (*Event)->resetState();
+    return AMDGPUEventManager.getResource(*Event);
   }
 
   /// Destroy a previously created event.
   Error destroyEventImpl(void *EventPtr) override {
     AMDGPUEventTy *Event = reinterpret_cast<AMDGPUEventTy *>(EventPtr);
-    assert(Event && "Invalid event");
-
-    if (auto Err = Event->resetState())
-      return Err;
-
     return AMDGPUEventManager.returnResource(Event);
   }
 
@@ -2988,19 +2869,6 @@ struct AMDGPUDeviceTy : public GenericDeviceTy, AMDGenericDeviceTy {
   Error syncEventImpl(void *EventPtr) override {
     AMDGPUEventTy *Event = reinterpret_cast<AMDGPUEventTy *>(EventPtr);
     return Event->sync();
-  }
-
-  /// Get the elapsed time in milliseconds between two events.
-  Expected<float> getEventElapsedTimeImpl(void *StartEventPtr,
-                                          void *EndEventPtr) override {
-    AMDGPUEventTy *StartEvent =
-        reinterpret_cast<AMDGPUEventTy *>(StartEventPtr);
-    AMDGPUEventTy *EndEvent = reinterpret_cast<AMDGPUEventTy *>(EndEventPtr);
-
-    if (!StartEvent || !EndEvent)
-      return Plugin::error(ErrorCode::INVALID_ARGUMENT, "invalid event handle");
-
-    return StartEvent->getElapsedTime(*EndEvent);
   }
 
   /// Print information about the device.
@@ -3479,10 +3347,6 @@ private:
   /// The frequency of the steady clock inside the device.
   uint64_t ClockFrequency;
 
-  /// The HSA system timestamp frequency reported by the runtime. Zero means
-  /// unavailable.
-  uint64_t SystemTimestampFrequency = 0;
-
   /// The total number of concurrent work items that can be running on the GPU.
   uint64_t HardwareParallelism;
 
@@ -3588,83 +3452,6 @@ AMDGPUStreamTy::AMDGPUStreamTy(AMDGPUDeviceTy &Device)
       Slots(32), NextSlot(0), SyncCycle(0),
       StreamBusyWaitMicroseconds(Device.getStreamBusyWaitMicroseconds()),
       UseMultipleSdmaEngines(Device.useMultipleSdmaEngines()) {}
-
-Error AMDGPUEventTy::releaseTimingSignal(AMDGPUSignalTy **ReusableSignalPtr) {
-  AMDGPUSignalTy *Signal = TimingSignal;
-  TimingSignal = nullptr;
-
-  if (!Signal)
-    return Plugin::success();
-
-  if (!Signal->decreaseUseCount())
-    return Plugin::success();
-
-  if (ReusableSignalPtr) {
-    *ReusableSignalPtr = Signal;
-    return Plugin::success();
-  }
-
-  return Device.getSignalManager().returnResource(Signal);
-}
-
-Expected<float> AMDGPUEventTy::getElapsedTime(AMDGPUEventTy &EndEvent) {
-  if (this == &EndEvent) {
-    std::lock_guard<std::mutex> Lock(Mutex);
-
-    if (!TimingSignal)
-      return Plugin::error(ErrorCode::INVALID_ARGUMENT,
-                           "event does not have a recorded timing signal");
-
-    if (TimingSignal->load())
-      return Plugin::error(ErrorCode::UNKNOWN, "event timing is not ready");
-
-    return 0.0f;
-  }
-
-  const uint64_t TicksPerSecond = Device.getSystemTimestampFrequency();
-  if (TicksPerSecond == 0)
-    return Plugin::error(ErrorCode::UNSUPPORTED,
-                         "HSA system timestamp frequency is unavailable");
-
-  std::scoped_lock<std::mutex, std::mutex> Lock(Mutex, EndEvent.Mutex);
-
-  if (&Device != &EndEvent.Device)
-    return Plugin::error(ErrorCode::INVALID_ARGUMENT,
-                         "events belong to different devices");
-
-  if (!TimingSignal || !EndEvent.TimingSignal)
-    return Plugin::error(
-        ErrorCode::INVALID_ARGUMENT,
-        "one or both events do not have a recorded timing signal");
-
-  if (TimingSignal->load() || EndEvent.TimingSignal->load())
-    return Plugin::error(
-        ErrorCode::UNKNOWN,
-        "timing information is not ready for one or both events");
-
-  hsa_amd_profiling_dispatch_time_t StartTime = {};
-  hsa_amd_profiling_dispatch_time_t StopTime = {};
-
-  hsa_status_t Status = hsa_amd_profiling_get_dispatch_time(
-      Device.getAgent(), TimingSignal->get(), &StartTime);
-  if (auto Err = Plugin::check(
-          Status, "error in hsa_amd_profiling_get_dispatch_time: %s"))
-    return std::move(Err);
-
-  Status = hsa_amd_profiling_get_dispatch_time(
-      EndEvent.Device.getAgent(), EndEvent.TimingSignal->get(), &StopTime);
-  if (auto Err = Plugin::check(
-          Status, "error in hsa_amd_profiling_get_dispatch_time: %s"))
-    return std::move(Err);
-
-  const int64_t DeltaTicks =
-      static_cast<int64_t>(StopTime.end) - static_cast<int64_t>(StartTime.end);
-  constexpr double MillisecondsPerSecond = 1000.0;
-
-  return static_cast<float>(static_cast<double>(DeltaTicks) *
-                            MillisecondsPerSecond /
-                            static_cast<double>(TicksPerSecond));
-}
 
 /// Class implementing the AMDGPU-specific functionalities of the global
 /// handler.
@@ -3852,7 +3639,8 @@ struct AMDGPUPluginTy final : public GenericPluginTy {
       return Err;
     for (auto &Target : Targets)
       if (offloading::amdgpu::isImageCompatibleWithEnv(
-              *Processor, ElfOrErr->getPlatformFlags(), Target.str()))
+              Processor ? *Processor : "", ElfOrErr->getPlatformFlags(),
+              Target.str()))
         return true;
     return false;
   }

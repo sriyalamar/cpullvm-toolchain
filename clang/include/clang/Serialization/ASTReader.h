@@ -224,8 +224,7 @@ public:
 
   /// This is called for each AST file loaded.
   virtual void visitModuleFile(ModuleFileName Filename,
-                               serialization::ModuleKind Kind,
-                               bool DirectlyImported) {}
+                               serialization::ModuleKind Kind) {}
 
   /// Returns true if this \c ASTReaderListener wants to receive the
   /// input files of the AST file via \c visitInputFile, false otherwise.
@@ -314,8 +313,8 @@ public:
   void ReadCounter(const serialization::ModuleFile &M, uint32_t Value) override;
   bool needsInputFileVisitation() override;
   bool needsSystemInputFileVisitation() override;
-  void visitModuleFile(ModuleFileName Filename, serialization::ModuleKind Kind,
-                       bool DirectlyImported) override;
+  void visitModuleFile(ModuleFileName Filename,
+                       serialization::ModuleKind Kind) override;
   bool visitInputFile(StringRef Filename, bool isSystem,
                       bool isOverridden, bool isExplicitModule) override;
   void readModuleFileExtension(

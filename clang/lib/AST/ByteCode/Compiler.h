@@ -309,8 +309,10 @@ protected:
   bool delegate(const Expr *E);
   /// Creates and initializes a variable from the given decl.
   VarCreationState visitVarDecl(const VarDecl *VD, const Expr *Init,
-                                bool Toplevel = false);
-  VarCreationState visitDecl(const VarDecl *VD);
+                                bool Toplevel = false,
+                                bool IsConstexprUnknown = false);
+  VarCreationState visitDecl(const VarDecl *VD,
+                             bool IsConstexprUnknown = false);
   /// Visit an APValue.
   bool visitAPValue(const APValue &Val, PrimType ValType, const Expr *E);
   bool visitAPValueInitializer(const APValue &Val, const Expr *E, QualType T);
@@ -330,11 +332,13 @@ protected:
   /// Creates a local primitive value.
   unsigned allocateLocalPrimitive(DeclTy &&Decl, PrimType Ty, bool IsConst,
                                   bool IsVolatile = false,
-                                  ScopeKind SC = ScopeKind::Block);
+                                  ScopeKind SC = ScopeKind::Block,
+                                  bool IsConstexprUnknown = false);
 
   /// Allocates a space storing a local given its type.
   UnsignedOrNone allocateLocal(DeclTy &&Decl, QualType Ty = QualType(),
-                               ScopeKind = ScopeKind::Block);
+                               ScopeKind = ScopeKind::Block,
+                               bool IsConstexprUnknown = false);
   UnsignedOrNone allocateTemporary(const Expr *E);
 
 private:
@@ -451,8 +455,6 @@ protected:
 
   bool InStmtExpr = false;
   bool ToLValue = false;
-
-  bool VariablesAreConstexprUnknown = false;
 
   /// Flag inidicating if we're initializing an already created
   /// variable. This is set in visitInitializer().

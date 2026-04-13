@@ -956,7 +956,8 @@ void CGHLSLRuntime::emitEntryFunction(const FunctionDecl *FD,
     OB.emplace_back("convergencectrl", bundleArgs);
   }
 
-  SmallVector<std::pair<llvm::Value *, llvm::Type *>> OutputSemantic;
+  llvm::DenseMap<const DeclaratorDecl *, std::pair<llvm::Value *, llvm::Type *>>
+      OutputSemantic;
 
   unsigned SRetOffset = 0;
   for (const auto &Param : Fn->args()) {
@@ -964,7 +965,7 @@ void CGHLSLRuntime::emitEntryFunction(const FunctionDecl *FD,
       SRetOffset = 1;
       llvm::Type *VarType = Param.getParamStructRetType();
       llvm::Value *Var = B.CreateAlloca(VarType);
-      OutputSemantic.push_back(std::make_pair(Var, VarType));
+      OutputSemantic.try_emplace(FD, std::make_pair(Var, VarType));
       Args.push_back(Var);
       continue;
     }
@@ -1001,17 +1002,17 @@ void CGHLSLRuntime::emitEntryFunction(const FunctionDecl *FD,
 
   if (Fn->getReturnType() != CGM.VoidTy)
     // Element type is unused, so set to dummy value (NULL).
-    OutputSemantic.push_back(std::make_pair(CI, nullptr));
+    OutputSemantic.try_emplace(FD, std::make_pair(CI, nullptr));
 
-  for (auto &SourcePair : OutputSemantic) {
+  for (auto &[Decl, SourcePair] : OutputSemantic) {
     llvm::Value *Source = SourcePair.first;
     llvm::Type *ElementType = SourcePair.second;
     AllocaInst *AI = dyn_cast<AllocaInst>(Source);
     llvm::Value *SourceValue = AI ? B.CreateLoad(ElementType, Source) : Source;
 
-    auto AttrBegin = FD->specific_attr_begin<HLSLAppliedSemanticAttr>();
-    auto AttrEnd = FD->specific_attr_end<HLSLAppliedSemanticAttr>();
-    handleSemanticStore(B, FD, SourceValue, FD, AttrBegin, AttrEnd);
+    auto AttrBegin = Decl->specific_attr_begin<HLSLAppliedSemanticAttr>();
+    auto AttrEnd = Decl->specific_attr_end<HLSLAppliedSemanticAttr>();
+    handleSemanticStore(B, FD, SourceValue, Decl, AttrBegin, AttrEnd);
   }
 
   B.CreateRetVoid();

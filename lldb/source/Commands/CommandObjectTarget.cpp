@@ -1911,6 +1911,10 @@ protected:
   void DoExecute(Args &command, CommandReturnObject &result) override {
     Target &target = GetTarget();
 
+    uint32_t addr_byte_size = target.GetArchitecture().GetAddressByteSize();
+    result.GetOutputStream().SetAddressByteSize(addr_byte_size);
+    result.GetErrorStream().SetAddressByteSize(addr_byte_size);
+
     size_t num_dumped = 0;
     if (command.GetArgumentCount() == 0) {
       // Dump all headers for all modules images
@@ -1929,8 +1933,8 @@ protected:
         size_t num_matched =
             FindModulesByName(&target, arg_cstr, module_list, true);
         if (num_matched == 0) {
-          result.AppendWarningWithFormatv(
-              "Unable to find an image that matches '{0}'.", arg_cstr);
+          result.AppendWarningWithFormat(
+              "Unable to find an image that matches '%s'.\n", arg_cstr);
         }
       }
       // Dump all the modules we found.
@@ -2012,6 +2016,10 @@ protected:
         (m_options.m_prefer_mangled ? Mangled::ePreferMangled
                                     : Mangled::ePreferDemangled);
 
+    uint32_t addr_byte_size = target.GetArchitecture().GetAddressByteSize();
+    result.GetOutputStream().SetAddressByteSize(addr_byte_size);
+    result.GetErrorStream().SetAddressByteSize(addr_byte_size);
+
     if (command.GetArgumentCount() == 0) {
       // Dump all sections for all modules images
       const ModuleList &module_list = target.GetImages();
@@ -2067,8 +2075,8 @@ protected:
             }
           }
         } else
-          result.AppendWarningWithFormatv(
-              "Unable to find an image that matches '{0}'.", arg_cstr);
+          result.AppendWarningWithFormat(
+              "Unable to find an image that matches '%s'.\n", arg_cstr);
       }
     }
 
@@ -2102,6 +2110,10 @@ protected:
   void DoExecute(Args &command, CommandReturnObject &result) override {
     Target &target = GetTarget();
     uint32_t num_dumped = 0;
+
+    uint32_t addr_byte_size = target.GetArchitecture().GetAddressByteSize();
+    result.GetOutputStream().SetAddressByteSize(addr_byte_size);
+    result.GetErrorStream().SetAddressByteSize(addr_byte_size);
 
     if (command.GetArgumentCount() == 0) {
       // Dump all sections for all modules images
@@ -2152,8 +2164,8 @@ protected:
           std::lock_guard<std::recursive_mutex> guard(
               Module::GetAllocationModuleCollectionMutex());
 
-          result.AppendWarningWithFormatv(
-              "Unable to find an image that matches '{0}'.", arg_cstr);
+          result.AppendWarningWithFormat(
+              "Unable to find an image that matches '%s'.\n", arg_cstr);
         }
       }
     }
@@ -2285,8 +2297,8 @@ protected:
         std::lock_guard<std::recursive_mutex> guard(
             Module::GetAllocationModuleCollectionMutex());
 
-        result.AppendWarningWithFormatv(
-            "Unable to find an image that matches '{0}'.", arg.c_str());
+        result.AppendWarningWithFormat(
+            "Unable to find an image that matches '%s'.\n", arg.c_str());
         continue;
       }
 
@@ -2326,6 +2338,10 @@ protected:
   void DoExecute(Args &command, CommandReturnObject &result) override {
     Target &target = GetTarget();
     uint32_t num_dumped = 0;
+
+    uint32_t addr_byte_size = target.GetArchitecture().GetAddressByteSize();
+    result.GetOutputStream().SetAddressByteSize(addr_byte_size);
+    result.GetErrorStream().SetAddressByteSize(addr_byte_size);
 
     if (command.GetArgumentCount() == 0) {
       // Dump all sections for all modules images
@@ -2369,8 +2385,8 @@ protected:
             }
           }
         } else
-          result.AppendWarningWithFormatv(
-              "Unable to find an image that matches '{0}'.", arg_cstr);
+          result.AppendWarningWithFormat(
+              "Unable to find an image that matches '%s'.\n", arg_cstr);
       }
     }
 
@@ -2406,6 +2422,10 @@ protected:
     Target *target = m_exe_ctx.GetTargetPtr();
     uint32_t total_num_dumped = 0;
 
+    uint32_t addr_byte_size = target->GetArchitecture().GetAddressByteSize();
+    result.GetOutputStream().SetAddressByteSize(addr_byte_size);
+    result.GetErrorStream().SetAddressByteSize(addr_byte_size);
+
     if (command.GetArgumentCount() == 0) {
       result.AppendError("file option must be specified");
       return;
@@ -2437,8 +2457,8 @@ protected:
               num_dumped++;
           }
           if (num_dumped == 0)
-            result.AppendWarningWithFormatv(
-                "No source filenames matched '{0}'.", arg_cstr);
+            result.AppendWarningWithFormat(
+                "No source filenames matched '%s'.\n", arg_cstr);
           else
             total_num_dumped += num_dumped;
         }
@@ -2549,6 +2569,10 @@ protected:
     Target &target = GetTarget();
     uint32_t num_dumped = 0;
 
+    uint32_t addr_byte_size = target.GetArchitecture().GetAddressByteSize();
+    result.GetOutputStream().SetAddressByteSize(addr_byte_size);
+    result.GetErrorStream().SetAddressByteSize(addr_byte_size);
+
     StructuredData::Array separate_debug_info_lists_by_module;
     if (command.GetArgumentCount() == 0) {
       // Dump all sections for all modules images
@@ -2596,8 +2620,8 @@ protected:
               num_dumped++;
           }
         } else
-          result.AppendWarningWithFormatv(
-              "Unable to find an image that matches '{0}'.", arg_cstr);
+          result.AppendWarningWithFormat(
+              "Unable to find an image that matches '%s'.\n", arg_cstr);
       }
     }
 
@@ -2645,8 +2669,9 @@ protected:
               } else if (type == "oso") {
                 DumpOsoFilesTable(strm, *files);
               } else {
-                result.AppendWarningWithFormatv(
-                    "Found unsupported debug info type '{0}'.", type);
+                result.AppendWarningWithFormat(
+                    "Found unsupported debug info type '%s'.\n",
+                    type.str().c_str());
               }
               return true;
             });
@@ -3182,6 +3207,9 @@ protected:
     // "locker" object which might lock its contents below (through the
     // "module_list_ptr" variable).
     ModuleList module_list;
+    uint32_t addr_byte_size = target.GetArchitecture().GetAddressByteSize();
+    result.GetOutputStream().SetAddressByteSize(addr_byte_size);
+    result.GetErrorStream().SetAddressByteSize(addr_byte_size);
     // Dump all sections for all modules images
     Stream &strm = result.GetOutputStream();
 
@@ -3611,10 +3639,10 @@ protected:
       if (!func_unwinders_sp)
         continue;
 
-      result.GetOutputStream().Format(
-          "UNWIND PLANS for {0}`{1} (start addr {2:x})\n",
-          sc.module_sp->GetPlatformFileSpec().GetFilename(), funcname,
-          start_addr);
+      result.GetOutputStream().Printf(
+          "UNWIND PLANS for %s`%s (start addr 0x%" PRIx64 ")\n",
+          sc.module_sp->GetPlatformFileSpec().GetFilename().AsCString(),
+          funcname.AsCString(), start_addr);
 
       Args args;
       target->GetUserSpecifiedTrapHandlerNames(args);
@@ -3643,20 +3671,20 @@ protected:
 
       if (std::shared_ptr<const UnwindPlan> plan_sp =
               func_unwinders_sp->GetUnwindPlanAtNonCallSite(*target, *thread)) {
-        result.GetOutputStream().Format(
-            "Asynchronous (not restricted to call-sites) UnwindPlan is '{0}'\n",
-            plan_sp->GetSourceName());
+        result.GetOutputStream().Printf(
+            "Asynchronous (not restricted to call-sites) UnwindPlan is '%s'\n",
+            plan_sp->GetSourceName().AsCString());
       }
       if (std::shared_ptr<const UnwindPlan> plan_sp =
               func_unwinders_sp->GetUnwindPlanAtCallSite(*target, *thread)) {
-        result.GetOutputStream().Format(
-            "Synchronous (restricted to call-sites) UnwindPlan is '{0}'\n",
-            plan_sp->GetSourceName());
+        result.GetOutputStream().Printf(
+            "Synchronous (restricted to call-sites) UnwindPlan is '%s'\n",
+            plan_sp->GetSourceName().AsCString());
       }
       if (std::shared_ptr<const UnwindPlan> plan_sp =
               func_unwinders_sp->GetUnwindPlanFastUnwind(*target, *thread)) {
-        result.GetOutputStream().Format("Fast UnwindPlan is '{0}'\n",
-                                        plan_sp->GetSourceName());
+        result.GetOutputStream().Printf("Fast UnwindPlan is '%s'\n",
+                                        plan_sp->GetSourceName().AsCString());
       }
 
       result.GetOutputStream().Printf("\n");
@@ -4071,6 +4099,9 @@ protected:
     bool syntax_error = false;
     uint32_t i;
     uint32_t num_successful_lookups = 0;
+    uint32_t addr_byte_size = target.GetArchitecture().GetAddressByteSize();
+    result.GetOutputStream().SetAddressByteSize(addr_byte_size);
+    result.GetErrorStream().SetAddressByteSize(addr_byte_size);
     // Dump all sections for all modules images
 
     if (command.GetArgumentCount() == 0) {
@@ -4122,8 +4153,8 @@ protected:
             }
           }
         } else
-          result.AppendWarningWithFormatv(
-              "Unable to find an image that matches '{0}'.", arg_cstr);
+          result.AppendWarningWithFormat(
+              "Unable to find an image that matches '%s'.\n", arg_cstr);
       }
     }
 
@@ -4369,10 +4400,16 @@ protected:
 
           // Make sure we load any scripting resources that may be embedded
           // in the debug info files in case the platform supports that.
-          std::list<Status> errors;
-          module_list.LoadScriptingResourcesInTarget(target, errors);
-          for (const auto &err : errors)
-            result.AppendWarning(err.AsCString());
+          Status error;
+          module_sp->LoadScriptingResourceInTarget(target, error);
+          if (error.Fail() && error.AsCString())
+            result.AppendWarningWithFormat(
+                "unable to load scripting data for module %s - error "
+                "reported was %s",
+                module_sp->GetFileSpec()
+                    .GetFileNameStrippingExtension()
+                    .GetCString(),
+                error.AsCString());
 
           flush = true;
           result.SetStatus(eReturnStatusSuccessFinishResult);
@@ -5471,14 +5508,13 @@ protected:
       return;
     }
 
-    Stream &strm = result.GetOutputStream();
-    strm << llvm::formatv("{0} frame provider(s) registered:\n\n",
-                          descriptors.size());
+    result.AppendMessageWithFormat("%u frame provider(s) registered:\n\n",
+                                   descriptors.size());
 
     for (const auto &entry : descriptors) {
       const ScriptedFrameProviderDescriptor &descriptor = entry.second;
-      descriptor.Dump(&strm);
-      strm.PutChar('\n');
+      descriptor.Dump(&result.GetOutputStream());
+      result.GetOutputStream().PutChar('\n');
     }
 
     result.SetStatus(eReturnStatusSuccessFinishResult);

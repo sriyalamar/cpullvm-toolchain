@@ -584,13 +584,8 @@ FIRToMemRef::convertArrayCoorOp(Operation *memOp, fir::ArrayCoorOp arrayCoorOp,
   MemRefType memRefTy = dyn_cast<MemRefType>(convertedVal.getType());
 
   bool isRebox = firMemref.getDefiningOp<fir::ReboxOp>() != nullptr;
-  bool isDescriptor = mlir::isa<fir::BaseBoxType>(firMemref.getType()) ||
-                      firMemref.getDefiningOp<fir::BoxAddrOp>() != nullptr;
 
-  // Static shape does not imply contiguous layout for descriptor-backed
-  // entities (e.g. boxed array sections with non-unit stride). Keep the
-  // reinterpret-cast path so descriptor strides are preserved.
-  if (memRefTy.hasStaticShape() && !isRebox && !isDescriptor)
+  if (memRefTy.hasStaticShape() && !isRebox)
     return std::pair{*converted, indices};
 
   unsigned rank = arrayCoorOp.getIndices().size();

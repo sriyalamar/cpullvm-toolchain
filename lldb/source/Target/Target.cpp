@@ -40,7 +40,6 @@
 #include "lldb/Interpreter/Interfaces/ScriptedBreakpointInterface.h"
 #include "lldb/Interpreter/Interfaces/ScriptedStopHookInterface.h"
 #include "lldb/Interpreter/OptionGroupWatchpoint.h"
-#include "lldb/Interpreter/OptionValueEnumeration.h"
 #include "lldb/Interpreter/OptionValues.h"
 #include "lldb/Interpreter/Property.h"
 #include "lldb/Symbol/Function.h"
@@ -871,8 +870,10 @@ BreakpointName *Target::FindBreakpointName(ConstString name, bool can_create,
   }
 
   if (!can_create) {
-    error = Status::FromErrorStringWithFormatv(
-        "Breakpoint name \"{0}\" doesn't exist and can_create is false.", name);
+    error = Status::FromErrorStringWithFormat(
+        "Breakpoint name \"%s\" doesn't exist and "
+        "can_create is false.",
+        name.AsCString());
     return nullptr;
   }
 
@@ -885,7 +886,7 @@ void Target::DeleteBreakpointName(ConstString name) {
   BreakpointNameList::iterator iter = m_breakpoint_names.find(name);
 
   if (iter != m_breakpoint_names.end()) {
-    const char *name_cstr = name.AsCString(nullptr);
+    const char *name_cstr = name.AsCString();
     m_breakpoint_names.erase(iter);
     for (auto bp_sp : m_breakpoint_list.Breakpoints())
       bp_sp->RemoveName(name_cstr);
@@ -894,7 +895,7 @@ void Target::DeleteBreakpointName(ConstString name) {
 
 void Target::RemoveNameFromBreakpoint(lldb::BreakpointSP &bp_sp,
                                       ConstString name) {
-  bp_sp->RemoveName(name.AsCString(nullptr));
+  bp_sp->RemoveName(name.AsCString());
 }
 
 void Target::ConfigureBreakpointName(
@@ -907,8 +908,7 @@ void Target::ConfigureBreakpointName(
 
 void Target::ApplyNameToBreakpoints(BreakpointName &bp_name) {
   llvm::Expected<std::vector<BreakpointSP>> expected_vector =
-      m_breakpoint_list.FindBreakpointsByName(
-          bp_name.GetName().AsCString(nullptr));
+      m_breakpoint_list.FindBreakpointsByName(bp_name.GetName().AsCString());
 
   if (!expected_vector) {
     LLDB_LOG(GetLog(LLDBLog::Breakpoints), "invalid breakpoint name: {}",
@@ -923,7 +923,7 @@ void Target::ApplyNameToBreakpoints(BreakpointName &bp_name) {
 void Target::GetBreakpointNames(std::vector<std::string> &names) {
   names.clear();
   for (const auto& bp_name_entry : m_breakpoint_names) {
-    names.push_back(bp_name_entry.first.GetString());
+    names.push_back(bp_name_entry.first.AsCString());
   }
   llvm::sort(names);
 }
@@ -1542,6 +1542,19 @@ Module *Target::GetExecutableModulePointer() {
   return GetExecutableModule().get();
 }
 
+static void LoadScriptingResourceForModule(const ModuleSP &module_sp,
+                                           Target *target) {
+  Status error;
+  if (module_sp && !module_sp->LoadScriptingResourceInTarget(target, error)) {
+    if (error.AsCString())
+      target->GetDebugger().GetAsyncErrorStream()->Printf(
+          "unable to load scripting data for module %s - error reported was "
+          "%s\n",
+          module_sp->GetFileSpec().GetFileNameStrippingExtension().GetCString(),
+          error.AsCString());
+  }
+}
+
 void Target::ClearModules(bool delete_locations) {
   ModulesDidUnload(m_images, delete_locations);
   m_section_load_history.Clear();
@@ -1844,13 +1857,9 @@ void Target::ModulesDidLoad(ModuleList &module_list) {
 
   const size_t num_images = module_list.GetSize();
   if (m_valid && num_images) {
-    std::list<Status> errors;
-    module_list.LoadScriptingResourcesInTarget(this, errors);
-    for (const auto &err : errors)
-      GetDebugger().GetAsyncErrorStream()->PutCString(err.AsCString());
-
     for (size_t idx = 0; idx < num_images; ++idx) {
       ModuleSP module_sp(module_list.GetModuleAtIndex(idx));
+      LoadScriptingResourceForModule(module_sp, this);
       LoadTypeSummariesForModule(module_sp);
       LoadFormattersForModule(module_sp);
     }
@@ -2601,7 +2610,7 @@ llvm::Expected<lldb::TypeSystemSP>
 Target::GetScratchTypeSystemForLanguage(lldb::LanguageType language,
                                         bool create_on_demand) {
   if (!m_valid)
-    return llvm::createStringError("invalid target");
+    return llvm::createStringError("Invalid Target");
 
   if (language == eLanguageTypeMipsAssembler // GNU AS and LLVM use it for all
                                              // assembly code
@@ -2805,7 +2814,7 @@ void Target::SetDefaultArchitecture(const ArchSpec &arch) {
 llvm::Error Target::SetLabel(llvm::StringRef label) {
   size_t n = LLDB_INVALID_INDEX32;
   if (llvm::to_integer(label, n))
-    return llvm::createStringError("cannot use integer as target label");
+    return llvm::createStringError("Cannot use integer as target label.");
   TargetList &targets = GetDebugger().GetTargetList();
   for (size_t i = 0; i < targets.GetNumTargets(); i++) {
     TargetSP target_sp = targets.GetTargetAtIndex(i);
@@ -3721,6 +3730,8 @@ llvm::Expected<uint32_t> Target::AddScriptedFrameProviderDescriptor(
   if (!descriptor.IsValid())
     return llvm::createStringError("invalid frame provider descriptor");
 
+  uint32_t descriptor_id = descriptor.GetID();
+
   llvm::StringRef name = descriptor.GetName();
   if (name.empty())
     return llvm::createStringError(
@@ -3729,27 +3740,12 @@ llvm::Expected<uint32_t> Target::AddScriptedFrameProviderDescriptor(
   {
     std::unique_lock<std::recursive_mutex> guard(
         m_frame_provider_descriptors_mutex);
-
-    // Check for duplicate: same class name and args (content hash).
-    uint32_t descriptor_hash = descriptor.GetHash();
-    for (const auto &entry : m_frame_provider_descriptors) {
-      if (entry.second.GetHash() == descriptor_hash)
-        GetDebugger().ReportWarning(
-            llvm::formatv("frame provider idx={0} with the same class name and "
-                          "arguments is already registered",
-                          entry.second.GetID())
-                .str());
-    }
-
-    uint32_t descriptor_id = m_next_frame_provider_id++;
-    ScriptedFrameProviderDescriptor new_descriptor = descriptor;
-    new_descriptor.SetID(descriptor_id);
-    m_frame_provider_descriptors[descriptor_id] = new_descriptor;
-
-    InvalidateThreadFrameProviders();
-
-    return descriptor_id;
+    m_frame_provider_descriptors[descriptor_id] = descriptor;
   }
+
+  InvalidateThreadFrameProviders();
+
+  return descriptor_id;
 }
 
 bool Target::RemoveScriptedFrameProviderDescriptor(uint32_t id) {
@@ -3770,13 +3766,12 @@ void Target::ClearScriptedFrameProviderDescriptors() {
     std::lock_guard<std::recursive_mutex> guard(
         m_frame_provider_descriptors_mutex);
     m_frame_provider_descriptors.clear();
-    m_next_frame_provider_id = 1;
   }
 
   InvalidateThreadFrameProviders();
 }
 
-const llvm::MapVector<uint32_t, ScriptedFrameProviderDescriptor> &
+const llvm::DenseMap<uint32_t, ScriptedFrameProviderDescriptor> &
 Target::GetScriptedFrameProviderDescriptors() const {
   std::lock_guard<std::recursive_mutex> guard(
       m_frame_provider_descriptors_mutex);
@@ -4384,12 +4379,6 @@ static constexpr OptionEnumValueElement g_load_script_from_sym_file_values[] = {
         eLoadScriptFromSymFileWarn,
         "warn",
         "Warn about debug scripts inside symbol files but do not load them.",
-    },
-    {
-        eLoadScriptFromSymFileTrusted,
-        "trusted",
-        "Load debug scripts inside trusted symbol files, and warn about "
-        "scripts from untrusted symbol files.",
     },
 };
 
@@ -5119,12 +5108,6 @@ LoadScriptFromSymFile TargetProperties::GetLoadScriptFromSymbolFile() const {
                g_target_properties[idx].default_uint_value));
 }
 
-void TargetProperties::SetLoadScriptFromSymbolFile(
-    LoadScriptFromSymFile load_style) {
-  const uint32_t idx = ePropertyLoadScriptFromSymbolFile;
-  SetPropertyAtIndex(idx, load_style);
-}
-
 LoadCWDlldbinitFile TargetProperties::GetLoadCWDlldbinitFile() const {
   const uint32_t idx = ePropertyLoadCWDlldbinitFile;
   return GetPropertyAtIndexAs<LoadCWDlldbinitFile>(
@@ -5293,33 +5276,6 @@ bool TargetProperties::GetDebugUtilityExpression() const {
 void TargetProperties::SetDebugUtilityExpression(bool debug) {
   const uint32_t idx = ePropertyDebugUtilityExpression;
   SetPropertyAtIndex(idx, debug);
-}
-
-std::optional<LoadScriptFromSymFile>
-TargetProperties::GetAutoLoadScriptsForModule(
-    llvm::StringRef module_name) const {
-  auto *dict = m_collection_sp->GetPropertyAtIndexAsOptionValueDictionary(
-      ePropertyAutoLoadScriptsForModules);
-  if (!dict)
-    return std::nullopt;
-
-  OptionValueSP value_sp = dict->GetValueForKey(module_name);
-  if (!value_sp)
-    return std::nullopt;
-
-  return value_sp->GetValueAs<LoadScriptFromSymFile>();
-}
-
-void TargetProperties::SetAutoLoadScriptsForModule(
-    llvm::StringRef module_name, LoadScriptFromSymFile load_style) {
-  auto *dict = m_collection_sp->GetPropertyAtIndexAsOptionValueDictionary(
-      ePropertyAutoLoadScriptsForModules);
-  if (!dict)
-    return;
-
-  dict->SetValueForKey(module_name,
-                       std::make_shared<OptionValueEnumeration>(
-                           g_load_script_from_sym_file_values, load_style));
 }
 
 // Target::TargetEventData

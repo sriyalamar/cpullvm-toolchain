@@ -9,7 +9,6 @@ add_clang_library(clangScalableStaticAnalysisFrameworkFrontend
   clangAST
   clangBasic
   clangFrontend
-  clangScalableStaticAnalysisFrameworkAnalyses
   clangScalableStaticAnalysisFrameworkCore
   clangSema
   )

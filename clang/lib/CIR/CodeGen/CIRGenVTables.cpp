@@ -146,7 +146,8 @@ mlir::Attribute CIRGenVTables::getVTableComponent(
 
   switch (component.getKind()) {
   case VTableComponent::CK_UnusedFunctionPointer:
-    return builder.getConstNullPtrAttr(builder.getUInt8PtrTy());
+    cgm.errorNYI("getVTableComponent: UnusedFunctionPointer");
+    return mlir::Attribute();
 
   case VTableComponent::CK_VCallOffset:
     return builder.getConstPtrAttr(builder.getUInt8PtrTy(),
@@ -212,7 +213,7 @@ mlir::Attribute CIRGenVTables::getVTableComponent(
       assert(!cir::MissingFeatures::pointerAuthentication());
     } else {
       // Otherwise we can use the method definition directly.
-      cir::FuncType fnTy = cgm.getTypes().getFunctionType(gd);
+      cir::FuncType fnTy = cgm.getTypes().getFunctionTypeForVTable(gd);
       fnPtr = cgm.getAddrOfFunction(gd, fnTy, /*ForVTable=*/true);
     }
 
@@ -827,7 +828,7 @@ cir::FuncOp CIRGenVTables::maybeEmitThunk(GlobalDecl gd,
       mCtx.mangleThunk(md, thunkAdjustments, /*elideOverrideInfo=*/true, out);
   }
 
-  cir::FuncType thunkVTableTy = cgm.getTypes().getFunctionType(gd);
+  cir::FuncType thunkVTableTy = cgm.getTypes().getFunctionTypeForVTable(gd);
   cir::FuncOp thunk = cgm.getAddrOfThunk(name, thunkVTableTy, gd);
 
   // If we don't need to emit a definition, return this declaration as is.

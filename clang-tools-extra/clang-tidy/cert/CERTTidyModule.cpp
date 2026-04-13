@@ -8,7 +8,6 @@
 
 #include "../ClangTidy.h"
 #include "../ClangTidyModule.h"
-#include "../bugprone/AssignmentInSelectionStatementCheck.h"
 #include "../bugprone/BadSignalToKillThreadCheck.h"
 #include "../bugprone/CommandProcessorCheck.h"
 #include "../bugprone/CopyConstructorMutatesArgumentCheck.h"
@@ -309,8 +308,6 @@ public:
     // EXP
     CheckFactories.registerCheck<bugprone::SuspiciousMemoryComparisonCheck>(
         "cert-exp42-c");
-    CheckFactories.registerCheck<bugprone::AssignmentInSelectionStatementCheck>(
-        "cert-exp45-c");
     // FLP
     CheckFactories.registerCheck<bugprone::FloatLoopCounterCheck>(
         "cert-flp30-c");

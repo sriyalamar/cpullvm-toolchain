@@ -299,7 +299,7 @@ struct UnwindState {
   uint64_t getCurrentLBRTarget() const { return LBRStack[LBRIndex].Target; }
   const LBREntry &getCurrentLBR() const { return LBRStack[LBRIndex]; }
   bool IsLastLBR() const { return LBRIndex == 0; }
-  size_t getLBRStackSize() const { return LBRStack.size(); }
+  bool getLBRStackSize() const { return LBRStack.size(); }
   void advanceLBR() { LBRIndex++; }
   ProfiledFrame *getParentFrame() { return CurrentLeafFrame->Parent; }
 

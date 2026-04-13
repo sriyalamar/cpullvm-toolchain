@@ -109,7 +109,7 @@ public:
 
 private:
   // initialize header from offset.
-  Error initializeHeader(uint64_t HeaderOffset);
+  void initializeHeader(uint64_t HeaderOffset);
 
   LLVM_ABI_FOR_TEST void destroyImpl();
   void moveImpl(MappedFileRegionArena &RHS) {

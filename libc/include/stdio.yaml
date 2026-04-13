@@ -1,6 +1,5 @@
 header: stdio.h
-standards:
-  - stdc
+header_template: stdio.h.def
 macros:
   - macro_name: "NULL"
     macro_header: null-macro.h
@@ -10,22 +9,6 @@ macros:
     macro_value: stdin
   - macro_name: stderr
     macro_value: stderr
-  - macro_name: SEEK_SET
-    macro_header: file-seek-macros.h
-  - macro_name: SEEK_CUR
-    macro_header: file-seek-macros.h
-  - macro_name: SEEK_END
-    macro_header: file-seek-macros.h
-  - macro_name: EOF
-    macro_header: stdio-macros.h
-  - macro_name: BUFSIZ
-    macro_header: stdio-macros.h
-  - macro_name: _IONBF
-    macro_header: stdio-macros.h
-  - macro_name: _IOLBF
-    macro_header: stdio-macros.h
-  - macro_name: _IOFBF
-    macro_header: stdio-macros.h
 types:
   - type_name: rsize_t
   - type_name: size_t

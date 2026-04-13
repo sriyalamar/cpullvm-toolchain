@@ -312,9 +312,9 @@ BodyFarm &AnalysisDeclContextManager::getBodyFarm() { return FunctionBodyFarm; }
 
 const StackFrameContext *
 AnalysisDeclContext::getStackFrame(const LocationContext *ParentLC,
-                                   const Expr *E, const CFGBlock *Blk,
+                                   const Stmt *S, const CFGBlock *Blk,
                                    unsigned BlockCount, unsigned Index) {
-  return getLocationContextManager().getStackFrame(this, ParentLC, E, Blk,
+  return getLocationContextManager().getStackFrame(this, ParentLC, S, Blk,
                                                    BlockCount, Index);
 }
 
@@ -428,16 +428,15 @@ void BlockInvocationContext::Profile(llvm::FoldingSetNodeID &ID) {
 //===----------------------------------------------------------------------===//
 
 const StackFrameContext *LocationContextManager::getStackFrame(
-    AnalysisDeclContext *Ctx, const LocationContext *Parent, const Expr *E,
-    const CFGBlock *Blk, unsigned BlockCount, unsigned StmtIdx) {
+    AnalysisDeclContext *ctx, const LocationContext *parent, const Stmt *s,
+    const CFGBlock *blk, unsigned blockCount, unsigned idx) {
   llvm::FoldingSetNodeID ID;
-  StackFrameContext::Profile(ID, Ctx, Parent, E, Blk, BlockCount, StmtIdx);
+  StackFrameContext::Profile(ID, ctx, parent, s, blk, blockCount, idx);
   void *InsertPos;
   auto *L =
    cast_or_null<StackFrameContext>(Contexts.FindNodeOrInsertPos(ID, InsertPos));
   if (!L) {
-    L = new StackFrameContext(Ctx, Parent, E, Blk, BlockCount, StmtIdx,
-                              ++NewID);
+    L = new StackFrameContext(ctx, parent, s, blk, blockCount, idx, ++NewID);
     Contexts.InsertNode(L, InsertPos);
   }
   return L;
@@ -515,9 +514,9 @@ void LocationContext::dumpStack(raw_ostream &Out) const {
         Out << "Calling " << AnalysisDeclContext::getFunctionName(D);
       else
         Out << "Calling anonymous code";
-      if (const Expr *E = cast<StackFrameContext>(LCtx)->getCallSite()) {
+      if (const Stmt *S = cast<StackFrameContext>(LCtx)->getCallSite()) {
         Out << " at line ";
-        printLocation(Out, SM, E->getBeginLoc());
+        printLocation(Out, SM, S->getBeginLoc());
       }
       break;
     case Block:
@@ -557,8 +556,8 @@ void LocationContext::printJson(raw_ostream &Out, const char *NL,
         Out << "anonymous code";
 
       Out << "\", \"location\": ";
-      if (const Expr *E = cast<StackFrameContext>(LCtx)->getCallSite()) {
-        printSourceLocationAsJson(Out, E->getBeginLoc(), SM);
+      if (const Stmt *S = cast<StackFrameContext>(LCtx)->getCallSite()) {
+        printSourceLocationAsJson(Out, S->getBeginLoc(), SM);
       } else {
         Out << "null";
       }

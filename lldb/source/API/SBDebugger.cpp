@@ -113,7 +113,7 @@ SBDebugger &SBDebugger::operator=(const SBDebugger &rhs) {
 const char *SBDebugger::GetBroadcasterClass() {
   LLDB_INSTRUMENT();
 
-  return ConstString(Debugger::GetStaticBroadcasterClass()).AsCString(nullptr);
+  return ConstString(Debugger::GetStaticBroadcasterClass()).AsCString();
 }
 
 const char *SBDebugger::GetProgressFromEvent(const lldb::SBEvent &event,
@@ -132,7 +132,7 @@ const char *SBDebugger::GetProgressFromEvent(const lldb::SBEvent &event,
   total = progress_data->GetTotal();
   is_debugger_specific = progress_data->IsDebuggerSpecific();
   ConstString message(progress_data->GetMessage());
-  return message.AsCString(nullptr);
+  return message.AsCString();
 }
 
 lldb::SBStructuredData
@@ -1269,7 +1269,7 @@ const char *SBDebugger::GetInstanceName() {
   if (!m_opaque_sp)
     return nullptr;
 
-  return ConstString(m_opaque_sp->GetInstanceName()).AsCString(nullptr);
+  return ConstString(m_opaque_sp->GetInstanceName()).AsCString();
 }
 
 SBError SBDebugger::SetInternalVariable(const char *var_name, const char *value,

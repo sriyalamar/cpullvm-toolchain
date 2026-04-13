@@ -2843,10 +2843,8 @@ public:
     Instruction *OldUserI = cast<Instruction>(OldUse->getUser());
     IRB.SetInsertPoint(OldUserI);
     IRB.SetCurrentDebugLocation(OldUserI->getDebugLoc());
-    // Avoid materializing the name prefix when it is discarded anyway.
-    if (!IRB.getContext().shouldDiscardValueNames())
-      IRB.getInserter().SetNamePrefix(Twine(NewAI.getName()) + "." +
-                                      Twine(BeginOffset) + ".");
+    IRB.getInserter().SetNamePrefix(Twine(NewAI.getName()) + "." +
+                                    Twine(BeginOffset) + ".");
 
     CanSROA &= visit(cast<Instruction>(OldUse->getUser()));
     if (VecTy || IntTy)
@@ -3031,14 +3029,7 @@ public:
     // Instead of having these stores, we merge all the stored values into a
     // vector and store the merged value into the alloca
     std::queue<Value *> VecElements;
-    // StoreInfos is sorted by offset, not by block order. Anchoring to
-    // StoreInfos.back().Store (last by offset) can place shuffles before
-    // operands that appear later in the block (invalid SSA). Insert before
-    // TheLoad when it shares the store block (after all stores, before any
-    // later IR in that block). Otherwise insert before the store block's
-    // terminator so the merge runs after every store and any trailing
-    // instructions in that block.
-    IRBuilder<> Builder(LoadBB == StoreBB ? TheLoad : StoreBB->getTerminator());
+    IRBuilder<> Builder(StoreInfos.back().Store);
     for (const auto &Info : StoreInfos) {
       DeletedValues.push_back(Info.Store);
       VecElements.push(Info.StoredValue);

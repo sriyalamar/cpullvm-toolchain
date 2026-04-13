@@ -326,6 +326,8 @@ private:
   /// Do automatic reset in destructor
   bool AutoReset;
 
+  MCTargetOptions const *TargetOptions;
+
   bool HadError = false;
 
   void reportCommon(SMLoc Loc,
@@ -415,7 +417,7 @@ public:
 
   const MCSubtargetInfo *getSubtargetInfo() const { return MSTI; }
 
-  LLVM_ABI const MCTargetOptions *getTargetOptions() const;
+  const MCTargetOptions *getTargetOptions() const { return TargetOptions; }
 
   LLVM_ABI CodeViewContext &getCVContext();
 

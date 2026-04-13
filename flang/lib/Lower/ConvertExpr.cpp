@@ -927,11 +927,6 @@ public:
     return builder.createNullConstant(getLoc());
   }
 
-  template <typename A>
-  ExtValue genval(const Fortran::evaluate::ConditionalExpr<A> &) {
-    fir::emitFatalError(getLoc(), "ConditionalExpr should be lowered to HLFIR");
-  }
-
   static bool
   isDerivedTypeWithLenParameters(const Fortran::semantics::Symbol &sym) {
     if (const Fortran::semantics::DeclTypeSpec *declTy = sym.GetType())
@@ -5369,11 +5364,6 @@ private:
           .createAssign(temp, lf(iters));
       return temp;
     };
-  }
-
-  template <typename A>
-  CC genarr(const Fortran::evaluate::ConditionalExpr<A> &) {
-    fir::emitFatalError(getLoc(), "ConditionalExpr should be lowered to HLFIR");
   }
 
   template <typename T>

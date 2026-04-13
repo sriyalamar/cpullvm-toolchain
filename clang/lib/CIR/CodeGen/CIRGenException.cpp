@@ -273,12 +273,13 @@ void CIRGenFunction::addCatchHandlerAttr(
   }
 }
 
-mlir::LogicalResult
-CIRGenFunction::emitCXXTryStmt(const CXXTryStmt &s,
-                               cxxTryBodyEmitter &bodyCallback) {
-  mlir::Location loc = getLoc(s.getSourceRange());
+mlir::LogicalResult CIRGenFunction::emitCXXTryStmt(const CXXTryStmt &s) {
+  if (s.getTryBlock()->body_empty())
+    return mlir::LogicalResult::success();
 
+  mlir::Location loc = getLoc(s.getSourceRange());
   // Create a scope to hold try local storage for catch params.
+
   mlir::OpBuilder::InsertPoint scopeIP;
   cir::ScopeOp::create(
       builder, loc,
@@ -325,7 +326,7 @@ CIRGenFunction::emitCXXTryStmt(const CXXTryStmt &s,
         // are created for statements within the try body before exiting the
         // try body.
         RunCleanupsScope tryBodyCleanups(*this);
-        if (bodyCallback(*this).failed())
+        if (emitStmt(s.getTryBlock(), /*useCurrentScope=*/true).failed())
           tryRes = mlir::failure();
         tryBodyCleanups.forceCleanup();
         cir::YieldOp::create(builder, loc);
@@ -414,25 +415,6 @@ CIRGenFunction::emitCXXTryStmt(const CXXTryStmt &s,
   }
 
   return mlir::success();
-}
-
-mlir::LogicalResult CIRGenFunction::emitCXXTryStmt(const CXXTryStmt &s) {
-  if (s.getTryBlock()->body_empty())
-    return mlir::LogicalResult::success();
-
-  struct simpleTryBodyEmitter final : cxxTryBodyEmitter {
-    const clang::CXXTryStmt &s;
-    simpleTryBodyEmitter(const clang::CXXTryStmt &s) : s(s) {}
-
-    mlir::LogicalResult operator()(CIRGenFunction &cgf) override {
-      return cgf.emitStmt(s.getTryBlock(), /*useCurrentScope=*/true);
-    }
-    ~simpleTryBodyEmitter() override = default;
-  };
-
-  simpleTryBodyEmitter emitter{s};
-
-  return emitCXXTryStmt(s, emitter);
 }
 
 // in classic codegen this function is mapping to `isInvokeDest` previously and

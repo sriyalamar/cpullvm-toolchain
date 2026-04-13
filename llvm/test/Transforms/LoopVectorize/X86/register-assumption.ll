@@ -26,4 +26,7 @@ loop_body.dim.018:                                ; preds = %loop_body.dim.018, 
   br i1 %1, label %loop_header.dim.017.preheader, label %loop_body.dim.018
 }
 
-declare void @llvm.assume(i1)
+; Function Attrs: nounwind
+declare void @llvm.assume(i1) #0
+
+attributes #0 = { nounwind }

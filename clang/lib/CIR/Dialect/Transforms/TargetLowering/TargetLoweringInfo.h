@@ -15,8 +15,6 @@
 #define LLVM_CLANG_LIB_CIR_DIALECT_TRANSFORMS_TARGETLOWERING_TARGETLOWERINGINFO_H
 
 #include "clang/CIR/Dialect/IR/CIROpsEnums.h"
-#include <memory>
-#include <string>
 
 namespace cir {
 
@@ -26,17 +24,7 @@ public:
 
   virtual cir::SyncScopeKind
   convertSyncScope(cir::SyncScopeKind syncScope) const;
-
-  virtual unsigned
-  getTargetAddrSpaceFromCIRAddrSpace(cir::LangAddressSpace addrSpace) const {
-    return 0;
-  };
 };
-
-// Target-specific factory functions.
-std::unique_ptr<TargetLoweringInfo> createAMDGPUTargetLoweringInfo();
-
-std::unique_ptr<TargetLoweringInfo> createNVPTXTargetLoweringInfo();
 
 } // namespace cir
 

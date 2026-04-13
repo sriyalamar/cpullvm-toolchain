@@ -906,14 +906,7 @@ class LoadedModule {
 class ListOfModules {
  public:
   ListOfModules() : initialized(false) {}
-  ~ListOfModules() {
-    clear();
-    if (initialized)
-      modules_.Destroy();
-  }
-  ListOfModules(const ListOfModules&) = delete;
-  ListOfModules& operator=(const ListOfModules&) = delete;
-
+  ~ListOfModules() { clear(); }
   void init();
   void fallbackInit();  // Uses fallback init if available, otherwise clears
   const LoadedModule *begin() const { return modules_.begin(); }

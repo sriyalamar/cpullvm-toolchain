@@ -469,9 +469,6 @@ static void parseCodeGenArgs(Fortran::frontend::CodeGenOptions &opts,
     opts.ProfileInstrumentUsePath = A->getValue();
   }
 
-  opts.SampleProfileFile =
-      args.getLastArgValue(clang::options::OPT_fprofile_sample_use_EQ);
-
   // -mcmodel option.
   if (const llvm::opt::Arg *a =
           args.getLastArg(clang::options::OPT_mcmodel_EQ)) {

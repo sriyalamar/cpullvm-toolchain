@@ -205,8 +205,7 @@ bool AMDGPURewriteAGPRCopyMFMAImpl::recomputeRegClassExceptRewritable(
       if (!NewRC || NewRC == OldRC) {
         LLVM_DEBUG(dbgs() << "User of " << printReg(Reg, &TRI)
                           << " cannot be reassigned to "
-                          << (NewRC ? TRI.getRegClassName(NewRC) : "NULL")
-                          << ": " << *MI);
+                          << TRI.getRegClassName(NewRC) << ": " << *MI);
         return false;
       }
     }

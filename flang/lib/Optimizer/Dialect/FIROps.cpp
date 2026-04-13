@@ -1802,8 +1802,7 @@ mlir::Speculation::Speculatability fir::ConvertOp::getSpeculatability() {
   // Also disallow speculation for converts to/from non-FIR types, except
   // for some builtin types.
   auto canSpeculateType = [](mlir::Type ty) {
-    if (fir::isa_fir_type(ty) || fir::isa_integer(ty) ||
-        mlir::isa<mlir::MemRefType>(ty))
+    if (fir::isa_fir_type(ty) || fir::isa_integer(ty))
       return true;
     return false;
   };

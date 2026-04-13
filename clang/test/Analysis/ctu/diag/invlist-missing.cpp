@@ -15,5 +15,6 @@
 int foo(int);
 
 void test() {
-  foo(1); // expected-error-re{{error opening '{{.+}}nonexistent.yaml': required by the CrossTU functionality}}
+  // expected-no-diagnostics
+  foo(1); // no-warning. Ignoring "Invocation list file is not found."
 }

@@ -330,8 +330,7 @@ public:
     return LLDB_INVALID_OFFSET;
   }
 
-  virtual bool ParseVendorDWARFOpcode(uint8_t op,
-                                      const llvm::DataExtractor &opcodes,
+  virtual bool ParseVendorDWARFOpcode(uint8_t op, const DataExtractor &opcodes,
                                       lldb::offset_t &offset,
                                       RegisterContext *reg_ctx,
                                       lldb::RegisterKind reg_kind,

@@ -1,7 +1,3 @@
-module BoundsUnsafe {
-  header "BoundsUnsafe.h"
-}
-
 module ExternCtx {
   header "ExternCtx.h"
 }

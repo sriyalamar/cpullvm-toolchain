@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "lldb/Symbol/CompilerType.h"
+
 #include "lldb/Core/Debugger.h"
 #include "lldb/Symbol/Type.h"
 #include "lldb/Target/ExecutionContext.h"
@@ -20,7 +21,6 @@
 #include "lldb/Utility/Stream.h"
 #include "lldb/Utility/StreamString.h"
 #include "lldb/lldb-enumerations.h"
-#include "llvm/Support/ErrorExtras.h"
 
 #include <iterator>
 #include <mutex>
@@ -769,7 +769,7 @@ CompilerType::GetBitSize(ExecutionContextScope *exe_scope) const {
   if (IsValid())
     if (auto type_system_sp = GetTypeSystem())
       return type_system_sp->GetBitSize(m_type, exe_scope);
-  return llvm::createStringError("invalid type: cannot determine size");
+  return llvm::createStringError("Invalid type: Cannot determine size");
 }
 
 llvm::Expected<uint64_t>
@@ -1036,7 +1036,8 @@ CompilerType::GetIndexOfChildWithName(llvm::StringRef name,
       return type_system_sp->GetIndexOfChildWithName(m_type, name,
                                                      omit_empty_base_classes);
   }
-  return llvm::createStringErrorV("type has no child named '{0}'", name);
+  return llvm::createStringError("Type has no child named '%s'",
+                                 name.str().c_str());
 }
 
 // Dumping types

@@ -7043,9 +7043,9 @@ extern const internal::VariadicDynCastAllOfMatcher<
     templateSpecializationTypeLoc;
 
 /// Matches template specialization `TypeLoc`s, class template specializations,
-/// variable template specializations, unresolved overloads, and function
-/// template specializations that have at least one `TemplateArgumentLoc`
-/// matching the given `InnerMatcher`.
+/// variable template specializations, and function template specializations
+/// that have at least one `TemplateArgumentLoc` matching the given
+/// `InnerMatcher`.
 ///
 /// Given
 /// \code
@@ -7059,8 +7059,7 @@ AST_POLYMORPHIC_MATCHER_P(
     hasAnyTemplateArgumentLoc,
     AST_POLYMORPHIC_SUPPORTED_TYPES(ClassTemplateSpecializationDecl,
                                     VarTemplateSpecializationDecl, FunctionDecl,
-                                    DeclRefExpr, TemplateSpecializationTypeLoc,
-                                    OverloadExpr),
+                                    DeclRefExpr, TemplateSpecializationTypeLoc),
     internal::Matcher<TemplateArgumentLoc>, InnerMatcher) {
   auto Args = internal::getTemplateArgsWritten(Node);
   return matchesFirstInRange(InnerMatcher, Args.begin(), Args.end(), Finder,
@@ -7069,9 +7068,8 @@ AST_POLYMORPHIC_MATCHER_P(
 }
 
 /// Matches template specialization `TypeLoc`s, class template specializations,
-/// variable template specializations, unresolved overloads, and function
-/// template specializations where the n'th `TemplateArgumentLoc` matches the
-/// given `InnerMatcher`.
+/// variable template specializations, and function template specializations
+/// where the n'th `TemplateArgumentLoc` matches the given `InnerMatcher`.
 ///
 /// Given
 /// \code
@@ -7086,35 +7084,11 @@ AST_POLYMORPHIC_MATCHER_P2(
     hasTemplateArgumentLoc,
     AST_POLYMORPHIC_SUPPORTED_TYPES(ClassTemplateSpecializationDecl,
                                     VarTemplateSpecializationDecl, FunctionDecl,
-                                    DeclRefExpr, TemplateSpecializationTypeLoc,
-                                    OverloadExpr),
+                                    DeclRefExpr, TemplateSpecializationTypeLoc),
     unsigned, Index, internal::Matcher<TemplateArgumentLoc>, InnerMatcher) {
   auto Args = internal::getTemplateArgsWritten(Node);
   return Index < Args.size() &&
          InnerMatcher.matches(Args[Index], Finder, Builder);
-}
-
-/// Matches template specialization `TypeLoc`s, class template specializations,
-/// variable template specializations, unresolved overloads, and function
-/// template specializations that have exactly `MatchCount` number of
-/// `TemplateArgumentLoc`s.
-///
-/// Given
-/// \code
-///   template<typename T> class A {};
-///   A<int> a;
-/// \endcode
-/// varDecl(hasTypeLoc(templateSpecializationTypeLoc(templateArgumentLocCountIs(1))))
-///   matches `A<int> a`.
-AST_POLYMORPHIC_MATCHER_P(
-    templateArgumentLocCountIs,
-    AST_POLYMORPHIC_SUPPORTED_TYPES(ClassTemplateSpecializationDecl,
-                                    VarTemplateSpecializationDecl, FunctionDecl,
-                                    DeclRefExpr, TemplateSpecializationTypeLoc,
-                                    OverloadExpr),
-    unsigned, MatchCount) {
-  unsigned Count = internal::getNumTemplateArgsWritten(Node);
-  return Count == MatchCount;
 }
 
 /// Matches type \c bool.

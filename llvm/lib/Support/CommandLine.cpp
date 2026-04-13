@@ -839,10 +839,9 @@ void cl::TokenizeGNUCommandLine(StringRef Src, StringSaver &Saver,
                                 SmallVectorImpl<const char *> &NewArgv,
                                 bool MarkEOLs) {
   SmallString<128> Token;
-  bool InToken = false;
   for (size_t I = 0, E = Src.size(); I != E; ++I) {
     // Consume runs of whitespace.
-    if (!InToken) {
+    if (Token.empty()) {
       while (I != E && isWhitespace(Src[I])) {
         // Mark the end of lines in response files.
         if (MarkEOLs && Src[I] == '\n')
@@ -851,7 +850,6 @@ void cl::TokenizeGNUCommandLine(StringRef Src, StringSaver &Saver,
       }
       if (I == E)
         break;
-      InToken = true;
     }
 
     char C = Src[I];
@@ -880,12 +878,12 @@ void cl::TokenizeGNUCommandLine(StringRef Src, StringSaver &Saver,
 
     // End the token if this is whitespace.
     if (isWhitespace(C)) {
-      NewArgv.push_back(Saver.save(Token.str()).data());
+      if (!Token.empty())
+        NewArgv.push_back(Saver.save(Token.str()).data());
       // Mark the end of lines in response files.
       if (MarkEOLs && C == '\n')
         NewArgv.push_back(nullptr);
       Token.clear();
-      InToken = false;
       continue;
     }
 
@@ -894,7 +892,7 @@ void cl::TokenizeGNUCommandLine(StringRef Src, StringSaver &Saver,
   }
 
   // Append the last token after hitting EOF with no whitespace.
-  if (InToken)
+  if (!Token.empty())
     NewArgv.push_back(Saver.save(Token.str()).data());
 }
 

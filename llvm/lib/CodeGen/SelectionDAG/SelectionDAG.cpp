@@ -1050,17 +1050,6 @@ static bool doNotCSE(SDNode *N) {
   return false;
 }
 
-/// Construct a DemandedElts mask which demands all elements of \p V.
-/// If \p V is not a fixed-length vector, then this will return a single bit.
-static APInt getDemandAllEltsMask(SDValue V) {
-  EVT VT = V.getValueType();
-  // Since the number of lanes in a scalable vector is unknown at compile time,
-  // we track one bit which is implicitly broadcast to all lanes.  This means
-  // that all lanes in a scalable vector are considered demanded.
-  return VT.isFixedLengthVector() ? APInt::getAllOnes(VT.getVectorNumElements())
-                                  : APInt(1, 1);
-}
-
 /// RemoveDeadNodes - This method deletes all unreachable nodes in the
 /// SelectionDAG.
 void SelectionDAG::RemoveDeadNodes() {
@@ -2833,7 +2822,7 @@ SDValue SelectionDAG::FoldSetCC(EVT VT, SDValue N1, SDValue N2,
     ISD::CondCode SwappedCond = ISD::getSetCCSwappedOperands(Cond);
     if (!TLI->isCondCodeLegal(SwappedCond, OpVT.getSimpleVT()))
       return SDValue();
-    return getSetCC(dl, VT, N2, N1, SwappedCond, /*Chain=*/{},
+    return getSetCC(dl, VT, N2, N1, SwappedCond, /*Chian=*/{},
                     /*IsSignaling=*/false, Flags);
   } else if ((N2CFP && N2CFP->getValueAPF().isNaN()) ||
              (OpVT.isFloatingPoint() && (N1.isUndef() || N2.isUndef()))) {
@@ -3301,7 +3290,10 @@ SelectionDAG::getValidShiftAmount(SDValue V, const APInt &DemandedElts,
 
 std::optional<unsigned>
 SelectionDAG::getValidShiftAmount(SDValue V, unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(V);
+  EVT VT = V.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return getValidShiftAmount(V, DemandedElts, Depth);
 }
 
@@ -3319,7 +3311,10 @@ SelectionDAG::getValidMinimumShiftAmount(SDValue V, const APInt &DemandedElts,
 
 std::optional<unsigned>
 SelectionDAG::getValidMinimumShiftAmount(SDValue V, unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(V);
+  EVT VT = V.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return getValidMinimumShiftAmount(V, DemandedElts, Depth);
 }
 
@@ -3337,7 +3332,10 @@ SelectionDAG::getValidMaximumShiftAmount(SDValue V, const APInt &DemandedElts,
 
 std::optional<unsigned>
 SelectionDAG::getValidMaximumShiftAmount(SDValue V, unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(V);
+  EVT VT = V.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return getValidMaximumShiftAmount(V, DemandedElts, Depth);
 }
 
@@ -3345,7 +3343,14 @@ SelectionDAG::getValidMaximumShiftAmount(SDValue V, unsigned Depth) const {
 /// them in Known. For vectors, the known bits are those that are shared by
 /// every vector element.
 KnownBits SelectionDAG::computeKnownBits(SDValue Op, unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+
+  // Since the number of lanes in a scalable vector is unknown at compile time,
+  // we track one bit which is implicitly broadcast to all lanes.  This means
+  // that all lanes in a scalable vector are considered demanded.
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return computeKnownBits(Op, DemandedElts, Depth);
 }
 
@@ -4665,7 +4670,10 @@ SelectionDAG::computeOverflowForSignedMul(SDValue N0, SDValue N1) const {
 
 ConstantRange SelectionDAG::computeConstantRange(SDValue Op, bool ForSigned,
                                                  unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return computeConstantRange(Op, DemandedElts, ForSigned, Depth);
 }
 
@@ -4699,7 +4707,12 @@ ConstantRange SelectionDAG::computeConstantRange(SDValue Op,
 ConstantRange
 SelectionDAG::computeConstantRangeIncludingKnownBits(SDValue Op, bool ForSigned,
                                                      unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
+
   return computeConstantRangeIncludingKnownBits(Op, DemandedElts, ForSigned,
                                                 Depth);
 }
@@ -4717,7 +4730,15 @@ ConstantRange SelectionDAG::computeConstantRangeIncludingKnownBits(
 
 bool SelectionDAG::isKnownToBeAPowerOfTwo(SDValue Val, bool OrZero,
                                           unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Val);
+  EVT VT = Val.getValueType();
+
+  // Since the number of lanes in a scalable vector is unknown at compile time,
+  // we track one bit which is implicitly broadcast to all lanes.  This means
+  // that all lanes in a scalable vector are considered demanded.
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
+
   return isKnownToBeAPowerOfTwo(Val, DemandedElts, OrZero, Depth);
 }
 
@@ -4790,10 +4811,8 @@ bool SelectionDAG::isKnownToBeAPowerOfTwo(SDValue Val,
     // If x != 0:
     //    x & -x -> non-zero pow2
     // so if we find the pattern return whether we know `x` is non-zero.
-    SDValue X, Z;
-    if (sd_match(Val, m_And(m_Value(X), m_Neg(m_Deferred(X)))) ||
-        (sd_match(Val, m_And(m_Value(X), m_Sub(m_Value(Z), m_Deferred(X)))) &&
-         MaskedVectorIsZero(Z, DemandedElts, Depth + 1)))
+    SDValue X;
+    if (sd_match(Val, m_And(m_Value(X), m_Neg(m_Deferred(X)))))
       return OrZero || isKnownNeverZero(X, DemandedElts, Depth);
     break;
   }
@@ -4820,10 +4839,10 @@ bool SelectionDAG::isKnownToBeAPowerOfTwo(SDValue Val,
                                   Depth + 1);
   }
 
-  case ISD::TRUNCATE:
-    return (OrZero || isKnownNeverZero(Val, DemandedElts, Depth)) &&
-           isKnownToBeAPowerOfTwo(Val.getOperand(0), DemandedElts, OrZero,
-                                  Depth + 1);
+  case ISD::TRUNCATE: {
+    return (OrZero || isKnownNeverZero(Val, Depth)) &&
+           isKnownToBeAPowerOfTwo(Val.getOperand(0), OrZero, Depth + 1);
+  }
 
   case ISD::ROTL:
   case ISD::ROTR:
@@ -4838,9 +4857,9 @@ bool SelectionDAG::isKnownToBeAPowerOfTwo(SDValue Val,
   case ISD::SMAX:
   case ISD::UMIN:
   case ISD::UMAX:
-    return isKnownToBeAPowerOfTwo(Val.getOperand(1), DemandedElts, OrZero,
+    return isKnownToBeAPowerOfTwo(Val.getOperand(1), /*OrZero=*/false,
                                   Depth + 1) &&
-           isKnownToBeAPowerOfTwo(Val.getOperand(0), DemandedElts, OrZero,
+           isKnownToBeAPowerOfTwo(Val.getOperand(0), /*OrZero=*/false,
                                   Depth + 1);
 
   case ISD::SELECT:
@@ -4900,7 +4919,14 @@ bool SelectionDAG::isKnownToBeAPowerOfTwoFP(SDValue Val, unsigned Depth) const {
 }
 
 unsigned SelectionDAG::ComputeNumSignBits(SDValue Op, unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+
+  // Since the number of lanes in a scalable vector is unknown at compile time,
+  // we track one bit which is implicitly broadcast to all lanes.  This means
+  // that all lanes in a scalable vector are considered demanded.
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return ComputeNumSignBits(Op, DemandedElts, Depth);
 }
 
@@ -5618,7 +5644,10 @@ bool SelectionDAG::isGuaranteedNotToBeUndefOrPoison(SDValue Op, bool PoisonOnly,
   if (Op.getOpcode() == ISD::FREEZE)
     return true;
 
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return isGuaranteedNotToBeUndefOrPoison(Op, DemandedElts, PoisonOnly, Depth);
 }
 
@@ -5838,7 +5867,10 @@ bool SelectionDAG::isGuaranteedNotToBeUndefOrPoison(SDValue Op,
 bool SelectionDAG::canCreateUndefOrPoison(SDValue Op, bool PoisonOnly,
                                           bool ConsiderFlags,
                                           unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return canCreateUndefOrPoison(Op, DemandedElts, PoisonOnly, ConsiderFlags,
                                 Depth);
 }
@@ -6037,7 +6069,10 @@ bool SelectionDAG::isBaseWithConstantOffset(SDValue Op) const {
 KnownFPClass SelectionDAG::computeKnownFPClass(SDValue Op,
                                                FPClassTest InterestedClasses,
                                                unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
   return computeKnownFPClass(Op, DemandedElts, InterestedClasses, Depth);
 }
 
@@ -6056,8 +6091,7 @@ KnownFPClass SelectionDAG::computeKnownFPClass(SDValue Op,
   if (Op.getOpcode() == ISD::UNDEF)
     return Known;
 
-  EVT VT = Op.getValueType();
-  assert(VT.isFloatingPoint() && "Computing KnownFPClass on non-FP op!");
+  [[maybe_unused]] EVT VT = Op.getValueType();
   assert((!VT.isFixedLengthVector() ||
           DemandedElts.getBitWidth() == VT.getVectorNumElements()) &&
          "Unexpected vector size");
@@ -6093,34 +6127,6 @@ KnownFPClass SelectionDAG::computeKnownFPClass(SDValue Op,
     }
     break;
   }
-  case ISD::SPLAT_VECTOR: {
-    Known = computeKnownFPClass(Op.getOperand(0), InterestedClasses, Depth + 1);
-    break;
-  }
-  case ISD::BITCAST: {
-    // FIXME: It should not be necessary to check for an elementwise bitcast.
-    // If a bitcast is not elementwise between vector / scalar types,
-    // computeKnownBits already splices the known bits of the source elements
-    // appropriately so as to line up with the bits of the result's demanded
-    // elements.
-    EVT SrcVT = Op.getOperand(0).getValueType();
-    if (VT.isScalableVector() || SrcVT.isScalableVector())
-      break;
-    unsigned VTNumElts = VT.isVector() ? VT.getVectorNumElements() : 1;
-    unsigned SrcVTNumElts = SrcVT.isVector() ? SrcVT.getVectorNumElements() : 1;
-    if (VTNumElts != SrcVTNumElts)
-      break;
-
-    KnownBits Bits = computeKnownBits(Op, DemandedElts, Depth + 1);
-    Known = KnownFPClass::bitcast(VT.getFltSemantics(), Bits);
-    break;
-  }
-  case ISD::FABS: {
-    Known = computeKnownFPClass(Op.getOperand(0), DemandedElts,
-                                InterestedClasses, Depth + 1);
-    Known.fabs();
-    break;
-  }
   default:
     if (Opcode >= ISD::BUILTIN_OP_END || Opcode == ISD::INTRINSIC_WO_CHAIN ||
         Opcode == ISD::INTRINSIC_W_CHAIN || Opcode == ISD::INTRINSIC_VOID) {
@@ -6135,7 +6141,15 @@ KnownFPClass SelectionDAG::computeKnownFPClass(SDValue Op,
 
 bool SelectionDAG::isKnownNeverNaN(SDValue Op, bool SNaN,
                                    unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+
+  // Since the number of lanes in a scalable vector is unknown at compile time,
+  // we track one bit which is implicitly broadcast to all lanes.  This means
+  // that all lanes in a scalable vector are considered demanded.
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
+
   return isKnownNeverNaN(Op, DemandedElts, SNaN, Depth);
 }
 
@@ -6342,7 +6356,15 @@ bool SelectionDAG::isKnownNeverZeroFloat(SDValue Op) const {
 }
 
 bool SelectionDAG::isKnownNeverZero(SDValue Op, unsigned Depth) const {
-  APInt DemandedElts = getDemandAllEltsMask(Op);
+  EVT VT = Op.getValueType();
+
+  // Since the number of lanes in a scalable vector is unknown at compile time,
+  // we track one bit which is implicitly broadcast to all lanes.  This means
+  // that all lanes in a scalable vector are considered demanded.
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorNumElements())
+                           : APInt(1, 1);
+
   return isKnownNeverZero(Op, DemandedElts, Depth);
 }
 
@@ -8283,18 +8305,6 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
            N2.getOpcode() == ISD::TargetConstant && "Invalid FP_ROUND!");
     if (N1.getValueType() == VT) return N1;  // noop conversion.
     break;
-  case ISD::IS_FPCLASS: {
-    assert(N1.getValueType().isFloatingPoint() &&
-           "IS_FPCLASS is used for a non-floating type");
-    assert(isa<ConstantSDNode>(N2) && "FPClassTest is not Constant");
-    FPClassTest Mask = static_cast<FPClassTest>(N2->getAsZExtVal());
-    // If all tests are made, it doesn't matter what the value is.
-    if ((Mask & fcAllFlags) == fcAllFlags)
-      return getBoolConstant(true, DL, VT, N1.getValueType());
-    if ((Mask & fcAllFlags) == 0)
-      return getBoolConstant(false, DL, VT, N1.getValueType());
-    break;
-  }
   case ISD::AssertNoFPClass: {
     assert(N1.getValueType().isFloatingPoint() &&
            "AssertNoFPClass is used for a non-floating type");
@@ -13549,7 +13559,10 @@ bool llvm::isBitwiseNot(SDValue V, bool AllowUndefs) {
 
 ConstantSDNode *llvm::isConstOrConstSplat(SDValue N, bool AllowUndefs,
                                           bool AllowTruncation) {
-  APInt DemandedElts = getDemandAllEltsMask(N);
+  EVT VT = N.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorMinNumElements())
+                           : APInt(1, 1);
   return isConstOrConstSplat(N, DemandedElts, AllowUndefs, AllowTruncation);
 }
 
@@ -13591,7 +13604,10 @@ ConstantSDNode *llvm::isConstOrConstSplat(SDValue N, const APInt &DemandedElts,
 }
 
 ConstantFPSDNode *llvm::isConstOrConstSplatFP(SDValue N, bool AllowUndefs) {
-  APInt DemandedElts = getDemandAllEltsMask(N);
+  EVT VT = N.getValueType();
+  APInt DemandedElts = VT.isFixedLengthVector()
+                           ? APInt::getAllOnes(VT.getVectorMinNumElements())
+                           : APInt(1, 1);
   return isConstOrConstSplatFP(N, DemandedElts, AllowUndefs);
 }
 

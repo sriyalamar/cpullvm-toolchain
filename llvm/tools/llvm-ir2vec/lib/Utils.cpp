@@ -43,29 +43,16 @@ namespace llvm {
 
 namespace ir2vec {
 
-Expected<std::shared_ptr<Vocabulary>> loadVocabulary(StringRef VocabPath) {
+Error IR2VecTool::initializeVocabulary(StringRef VocabPath) {
   auto VocabOrErr = Vocabulary::fromFile(VocabPath);
   if (!VocabOrErr)
     return VocabOrErr.takeError();
 
-  auto V = std::make_shared<Vocabulary>(std::move(*VocabOrErr));
+  Vocab = std::make_unique<Vocabulary>(std::move(*VocabOrErr));
 
-  if (!V->isValid())
+  if (!Vocab->isValid())
     return createStringError(errc::invalid_argument,
                              "Failed to initialize IR2Vec vocabulary");
-  return V;
-}
-
-Error IR2VecTool::setVocabulary(std::shared_ptr<Vocabulary> V) {
-  if (!V)
-    return createStringError(errc::invalid_argument,
-                             "Null pointer provided for vocabulary. Will not "
-                             "set IR2VecTool vocabulary.");
-  if (!V->isValid())
-    return createStringError(
-        errc::invalid_argument,
-        "Vocabulary is not valid. Will not set IR2VecTool vocabulary.");
-  Vocab = std::move(V);
   return Error::success();
 }
 

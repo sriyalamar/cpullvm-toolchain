@@ -409,9 +409,6 @@ mlir::Type CIRGenTypes::convertType(QualType type) {
     case BuiltinType::BFloat16:
       resultType = cgm.bFloat16Ty;
       break;
-    case BuiltinType::MFloat8:
-      resultType = cgm.uInt8Ty;
-      break;
     case BuiltinType::Float:
       assert(&astContext.getFloatTypeSemantics(type) ==
                  &llvm::APFloat::IEEEsingle() &&
@@ -568,8 +565,7 @@ mlir::Type CIRGenTypes::convertType(QualType type) {
       resultType = cgm.sInt32Ty;
     } else {
       resultType = cir::IntType::get(&getMLIRContext(), bitIntTy->getNumBits(),
-                                     bitIntTy->isSigned(),
-                                     /*isBitInt=*/true);
+                                     bitIntTy->isSigned());
     }
     break;
   }

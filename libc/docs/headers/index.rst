@@ -33,7 +33,6 @@ Implementation Status
    strings
    sys/mman
    sys/resource
-   sys/socket
    sys/stat
    sys/statvfs
    sys/time
