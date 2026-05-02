@@ -1,0 +1,187 @@
+name: PR Hexframe Precheckin
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number for manual runs"
+        required: false
+        type: string
+      dry_run:
+        description: "Build and stage toolchain, but do not submit Hexframe"
+        required: true
+        type: boolean
+        default: true
+
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-hexframe-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-trigger-hexframe:
+    name: Build PR toolchain and trigger Hexframe
+    runs-on:
+      - self-hosted
+      - linux
+      - hexframe
+
+    # Safe default:
+    # - allow workflow_dispatch always
+    # - for pull_request, allow only PRs whose source branch is in the same repo
+    #   (blocks external fork PRs from landing on internal self-hosted runner)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.draft == false
+      )
+
+    env:
+      HF_BIN: /prj/llvm-arm/home/common/tools/hexframe/bin/hf_run.pl
+      HF_CONFIG: /prj/qct/llvm/devops/aether/arm/config/nightly/new_hf_configs/cpullvm-220/ubuntu24/llvm-arm-precheckin-correct.ini
+      SHARED_BASE: /prj/qct/llvm/devops/aether/tmp/hexframe/arm
+
+    steps:
+      - name: Preconfigure git
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          git config --global core.longpaths true
+
+      - name: Checkout PR/source
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          clean: true
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Compute run paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.event.inputs.pr_number || github.run_number }}"
+          RUN_ID="${GITHUB_RUN_ID}"
+
+          PR_ROOT="${SHARED_BASE}/pr-tools/pr-${PR_NUMBER}-${RUN_ID}"
+          TOOLS_DIR="${PR_ROOT}/install/install"
+          HF_TOP="${SHARED_BASE}/hexbuild/pr-${PR_NUMBER}-${RUN_ID}"
+
+          echo "PR_NUMBER=${PR_NUMBER}" >> "${GITHUB_ENV}"
+          echo "RUN_ID=${RUN_ID}" >> "${GITHUB_ENV}"
+          echo "PR_ROOT=${PR_ROOT}" >> "${GITHUB_ENV}"
+          echo "TOOLS_DIR=${TOOLS_DIR}" >> "${GITHUB_ENV}"
+          echo "HF_TOP=${HF_TOP}" >> "${GITHUB_ENV}"
+
+          echo "PR_NUMBER=${PR_NUMBER}"
+          echo "RUN_ID=${RUN_ID}"
+          echo "PR_ROOT=${PR_ROOT}"
+          echo "TOOLS_DIR=${TOOLS_DIR}"
+          echo "HF_TOP=${HF_TOP}"
+
+      - name: Validate internal prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          which bsub
+          test -x "${HF_BIN}"
+          test -f "${HF_CONFIG}"
+          mkdir -p "${PR_ROOT}"
+          mkdir -p "${HF_TOP}"
+
+      - name: Apply llvm-project patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qualcomm-software/cmake/patch_repo.py \
+            --method apply \
+            qualcomm-software/patches/llvm-project
+
+      - name: Build Linux x86 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./qualcomm-software/scripts/build.sh
+
+      - name: Locate built install dir
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TOOLS_SRC="$(find "${GITHUB_WORKSPACE}" -type d -path "*/install/install" | sort | head -n 1)"
+
+          if [ -z "${TOOLS_SRC}" ]; then
+            echo "Could not find built install dir under workspace."
+            echo "Expected something like */install/install"
+            exit 1
+          fi
+
+          echo "TOOLS_SRC=${TOOLS_SRC}" >> "${GITHUB_ENV}"
+          echo "TOOLS_SRC=${TOOLS_SRC}"
+
+      - name: Stage PR toolchain to shared path
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf "${PR_ROOT}"
+          mkdir -p "${TOOLS_DIR}"
+
+          cp -a "${TOOLS_SRC}/." "${TOOLS_DIR}/"
+
+          test -d "${TOOLS_DIR}"
+
+          echo "Staged toolchain:"
+          echo "  source = ${TOOLS_SRC}"
+          echo "  target = ${TOOLS_DIR}"
+
+      - name: Show Hexframe command
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "bsub -K -W 23:0 -R 'select[ubuntu24_llvm]' -q normal ${HF_BIN} --config-file=${HF_CONFIG} --top-dir=${HF_TOP} --tools-dir=${TOOLS_DIR}"
+
+      - name: Trigger Hexframe
+        shell: bash
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Dry run enabled. Skipping Hexframe submit."
+            exit 0
+          fi
+
+          bsub -K -W 23:0 -R "select[ubuntu24_llvm]" -q normal \
+            "${HF_BIN}" \
+            --config-file="${HF_CONFIG}" \
+            --top-dir="${HF_TOP}" \
+            --tools-dir="${TOOLS_DIR}"
+
+      - name: Job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## PR Hexframe Precheckin"
+            echo ""
+            echo "- PR number: ${PR_NUMBER}"
+            echo "- Run ID: ${RUN_ID}"
+            echo "- Built toolchain source: ${TOOLS_SRC:-not-found}"
+            echo "- Shared tools dir: ${TOOLS_DIR}"
+            echo "- Hexframe top dir: ${HF_TOP}"
+            echo "- Dry run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}"
+          } >> "${GITHUB_STEP_SUMMARY}"
