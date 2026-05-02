@@ -1,0 +1,68 @@
+name: HexFrame Trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "If true, print command only"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+
+    outputs:
+      app_token: ${{ steps.app-token.outputs.token }}
+
+    steps:
+      - name: Show basic context
+        run: |
+          echo "repo=${GITHUB_REPOSITORY}"
+          echo "ref=${GITHUB_REF}"
+          echo "sha=${GITHUB_SHA}"
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18
+        with:
+          app_id: ${{ secrets.SYNC_APP_ID }}
+          private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+      - name: Confirm App token creation
+        run: echo "✅ GitHub App token created"
+
+  hexframe-submit:
+    needs: sanity
+    runs-on: [self-hosted, linux, hexframe]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v4
+        with:
+          ref: ${{ github.ref_name }} 
+          token: ${{ needs.sanity.outputs.app_token || github.token }} 
+
+      - name: Validate internal environment
+        run: |
+          set -euo pipefail
+          which bsub
+          perl -v >/dev/null
+          test -x /prj/llvm-arm/home/common/tools/hexframe/bin/hf_run.pl
+          test -f /prj/qct/llvm/devops/aether/arm/config/nightly/new_hf_configs/cpullvm-220/ubuntu24/llvm-arm-precheckin-correct.ini 
+          test -d /prj/llvm-arm/hexbuild_home/nightly/install/cpu_pravanv_toolchain/install/install
+
+      - name: Run Hexframe trial
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          PR_NUMBER: manual
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          bash qualcomm-software/scripts/run_hexframe_precheckin.sh
