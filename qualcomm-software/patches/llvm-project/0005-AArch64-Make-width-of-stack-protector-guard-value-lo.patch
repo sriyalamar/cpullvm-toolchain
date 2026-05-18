@@ -1,0 +1,273 @@
+From 7296260f8e951a6d9f9bbcaef37791de0b6baade Mon Sep 17 00:00:00 2001
+From: Eli Friedman <efriedma@qti.qualcomm.com>
+Date: Thu, 14 May 2026 16:23:07 -0700
+Subject: [PATCH] [AArch64] Make width of stack protector guard value load
+ configurable. (#195379)
+
+Certain embedded targets store the value of the stack protector global
+in an MMIO register, which requires a load of a specific width. Allow
+changing the backend to emit a 4-byte load for the value of the stack
+protector, instead of an 8-byte load. (Or vice versa for an ilp32
+target.)
+
+The current version of the patch has a limitation: it still allocates a
+pointer-sized stack slot for the guard. This could be fixed in the
+future, if it becomes relevant.
+
+(Cherry-pick from main to 22 branch.)
+---
+ clang/include/clang/Basic/CodeGenOptions.def  |  3 ++
+ clang/include/clang/Options/Options.td        |  9 ++++
+ clang/lib/CodeGen/CodeGenModule.cpp           |  3 ++
+ clang/lib/Driver/ToolChains/Clang.cpp         | 19 ++++++++
+ clang/test/CodeGen/stack-protector-guard.c    |  5 +++
+ llvm/include/llvm/IR/Module.h                 |  4 ++
+ llvm/lib/IR/Module.cpp                        | 12 +++++
+ llvm/lib/Target/AArch64/AArch64InstrInfo.cpp  | 17 +++++--
+ .../test/CodeGen/AArch64/stack-guard-width.ll | 44 +++++++++++++++++++
+ 9 files changed, 113 insertions(+), 3 deletions(-)
+ create mode 100644 llvm/test/CodeGen/AArch64/stack-guard-width.ll
+
+diff --git a/clang/include/clang/Basic/CodeGenOptions.def b/clang/include/clang/Basic/CodeGenOptions.def
+index baf8b093c10e..575e36e8cf03 100644
+--- a/clang/include/clang/Basic/CodeGenOptions.def
++++ b/clang/include/clang/Basic/CodeGenOptions.def
+@@ -416,6 +416,9 @@ ENUM_CODEGENOPT(ExtendVariableLiveness, ExtendVariableLivenessKind, 2, ExtendVar
+ /// The default stack protector guard offset to use.
+ VALUE_CODEGENOPT(StackProtectorGuardOffset, 32, INT_MAX, Benign)
+ 
++/// The width to use for the stack protector guard value.
++VALUE_CODEGENOPT(StackProtectorGuardValueWidth, 32, UINT_MAX, Benign)
++
+ /// Number of path components to strip when emitting checks. (0 == full
+ /// filename)
+ VALUE_CODEGENOPT(EmitCheckPathComponentsToStrip, 32, 0, Benign)
+diff --git a/clang/include/clang/Options/Options.td b/clang/include/clang/Options/Options.td
+index b2b8dc5d44a5..e7ea3bedd78c 100644
+--- a/clang/include/clang/Options/Options.td
++++ b/clang/include/clang/Options/Options.td
+@@ -5833,6 +5833,15 @@ def mstack_protector_guard_offset_EQ : Joined<["-"], "mstack-protector-guard-off
+   Visibility<[ClangOption, CC1Option]>,
+   HelpText<"Use the given offset for addressing the stack-protector guard">,
+   MarshallingInfoInt<CodeGenOpts<"StackProtectorGuardOffset">, "INT_MAX", "int">;
++def mstack_protector_guard_value_width_EQ : Joined<["-"], "mstack-protector-guard-value-width=">, Group<m_Group>,
++  Visibility<[ClangOption, CC1Option]>,
++  HelpText<"Use the given width for the value of the the stack-protector guard (AArch64-only)">,
++  MarshallingInfoInt<CodeGenOpts<"StackProtectorGuardValueWidth">, "UINT_MAX", "unsigned">,
++  DocBrief<[{Set the width of the stack-protector guard variable. By default,
++the width is the same as the pointer width.  Currently only supported on AArch64
++targets.  Only the values "4" and "8" are currently supported.  This currently
++only modifies the size of accesses to the global variable, not the value
++stored on the stack.}]>;
+ def mstack_protector_guard_symbol_EQ : Joined<["-"], "mstack-protector-guard-symbol=">, Group<m_Group>,
+   Visibility<[ClangOption, CC1Option]>,
+   HelpText<"Use the given symbol for addressing the stack-protector guard">,
+diff --git a/clang/lib/CodeGen/CodeGenModule.cpp b/clang/lib/CodeGen/CodeGenModule.cpp
+index 85ed38f14462..5e0775322d8f 100644
+--- a/clang/lib/CodeGen/CodeGenModule.cpp
++++ b/clang/lib/CodeGen/CodeGenModule.cpp
+@@ -1551,6 +1551,9 @@ void CodeGenModule::Release() {
+   if (getCodeGenOpts().StackProtectorGuardOffset != INT_MAX)
+     getModule().setStackProtectorGuardOffset(
+         getCodeGenOpts().StackProtectorGuardOffset);
++  if (getCodeGenOpts().StackProtectorGuardValueWidth != UINT_MAX)
++    getModule().setStackProtectorGuardValueWidth(
++        getCodeGenOpts().StackProtectorGuardValueWidth);
+   if (getCodeGenOpts().StackAlignment)
+     getModule().setOverrideStackAlignment(getCodeGenOpts().StackAlignment);
+   if (getCodeGenOpts().SkipRaxSetup)
+diff --git a/clang/lib/Driver/ToolChains/Clang.cpp b/clang/lib/Driver/ToolChains/Clang.cpp
+index 18933cb8ad7c..de4ad9e18bb2 100644
+--- a/clang/lib/Driver/ToolChains/Clang.cpp
++++ b/clang/lib/Driver/ToolChains/Clang.cpp
+@@ -3600,6 +3600,25 @@ static void RenderSSPOptions(const Driver &D, const ToolChain &TC,
+     }
+     A->render(Args, CmdArgs);
+   }
++
++  if (Arg *A =
++          Args.getLastArg(options::OPT_mstack_protector_guard_value_width_EQ)) {
++    if (!EffectiveTriple.isAArch64())
++      D.Diag(diag::err_drv_unsupported_opt_for_target)
++          << A->getAsString(Args) << TripleStr;
++    StringRef Value = A->getValue();
++    unsigned Width;
++    if (Value.getAsInteger(10, Width)) {
++      D.Diag(diag::err_drv_invalid_value) << A->getOption().getName() << Value;
++      return;
++    }
++    if (Width != 4 && Width != 8) {
++      D.Diag(diag::err_drv_invalid_int_value)
++          << A->getOption().getName() << Value;
++      return;
++    }
++    A->render(Args, CmdArgs);
++  }
+ }
+ 
+ static void RenderSCPOptions(const ToolChain &TC, const ArgList &Args,
+diff --git a/clang/test/CodeGen/stack-protector-guard.c b/clang/test/CodeGen/stack-protector-guard.c
+index 82616ae800c4..74520057542a 100644
+--- a/clang/test/CodeGen/stack-protector-guard.c
++++ b/clang/test/CodeGen/stack-protector-guard.c
+@@ -9,6 +9,8 @@
+ // RUN: %clang_cc1 -mstack-protector-guard=sysreg -triple aarch64-linux-gnu \
+ // RUN:   -mstack-protector-guard-offset=1024 -mstack-protector-guard-reg=sp_el0 \
+ // RUN:   -emit-llvm %s -o - | FileCheck %s --check-prefix=AARCH64
++// RUN: %clang_cc1 -mstack-protector-guard-value-width=4 -triple aarch64-linux-gnu \
++// RUN:   -emit-llvm %s -o - | FileCheck %s --check-prefix=AARCH64-WIDTH-4
+ // RUN: %clang_cc1 -mstack-protector-guard=tls -triple riscv64-unknown-elf \
+ // RUN:   -mstack-protector-guard-offset=44 -mstack-protector-guard-reg=tp \
+ // RUN:   -emit-llvm %s -o - | FileCheck %s --check-prefix=RISCV
+@@ -33,6 +35,9 @@ void bar(int x) {
+ // AARCH64: [[ATTR2]] = !{i32 1, !"stack-protector-guard-reg", !"sp_el0"}
+ // AARCH64: [[ATTR3]] = !{i32 1, !"stack-protector-guard-offset", i32 1024}
+ 
++// AARCH64-WIDTH-4: !llvm.module.flags = !{{{.*}}[[ATTR1:![0-9]+]]}
++// AARCH64-WIDTH-4: [[ATTR1]] = !{i32 1, !"stack-protector-guard-value-width", i32 4}
++
+ // RISCV: !llvm.module.flags = !{{{.*}}[[ATTR1:![0-9]+]], [[ATTR2:![0-9]+]], [[ATTR3:![0-9]+]], [[ATTR4:![0-9]+]]}
+ // RISCV: [[ATTR1]] = !{i32 1, !"stack-protector-guard", !"tls"}
+ // RISCV: [[ATTR2]] = !{i32 1, !"stack-protector-guard-reg", !"tp"}
+diff --git a/llvm/include/llvm/IR/Module.h b/llvm/include/llvm/IR/Module.h
+index ac6c20b81d68..e9605fc0d5f9 100644
+--- a/llvm/include/llvm/IR/Module.h
++++ b/llvm/include/llvm/IR/Module.h
+@@ -1007,6 +1007,10 @@ public:
+   int getStackProtectorGuardOffset() const;
+   void setStackProtectorGuardOffset(int Offset);
+ 
++  /// Get/set the width in memory of the stack protector guard value.
++  std::optional<unsigned> getStackProtectorGuardValueWidth() const;
++  void setStackProtectorGuardValueWidth(unsigned Width);
++
+   /// Get/set the stack alignment overridden from the default.
+   unsigned getOverrideStackAlignment() const;
+   void setOverrideStackAlignment(unsigned Align);
+diff --git a/llvm/lib/IR/Module.cpp b/llvm/lib/IR/Module.cpp
+index e19336efd1c8..e00315401b63 100644
+--- a/llvm/lib/IR/Module.cpp
++++ b/llvm/lib/IR/Module.cpp
+@@ -802,6 +802,18 @@ void Module::setStackProtectorGuardOffset(int Offset) {
+   addModuleFlag(ModFlagBehavior::Error, "stack-protector-guard-offset", Offset);
+ }
+ 
++std::optional<unsigned> Module::getStackProtectorGuardValueWidth() const {
++  Metadata *MD = getModuleFlag("stack-protector-guard-value-width");
++  if (auto *CI = mdconst::dyn_extract_or_null<ConstantInt>(MD))
++    return CI->getZExtValue();
++  return std::nullopt;
++}
++
++void Module::setStackProtectorGuardValueWidth(unsigned Width) {
++  addModuleFlag(ModFlagBehavior::Error, "stack-protector-guard-value-width",
++                Width);
++}
++
+ unsigned Module::getOverrideStackAlignment() const {
+   Metadata *MD = getModuleFlag("override-stack-alignment");
+   if (auto *CI = mdconst::dyn_extract_or_null<ConstantInt>(MD))
+diff --git a/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp b/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
+index f07211325393..957438ee63e5 100644
+--- a/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
++++ b/llvm/lib/Target/AArch64/AArch64InstrInfo.cpp
+@@ -2496,10 +2496,14 @@ bool AArch64InstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
+   unsigned OpFlags = Subtarget.ClassifyGlobalReference(GV, TM);
+   const unsigned char MO_NC = AArch64II::MO_NC;
+ 
++  unsigned GuardWidth = M.getStackProtectorGuardValueWidth().value_or(
++      Subtarget.isTargetILP32() ? 4 : 8);
++  if (GuardWidth != 4 && GuardWidth != 8)
++    report_fatal_error("Unsupported stack protector value width");
+   if ((OpFlags & AArch64II::MO_GOT) != 0) {
+     BuildMI(MBB, MI, DL, get(AArch64::LOADgot), Reg)
+         .addGlobalAddress(GV, 0, OpFlags);
+-    if (Subtarget.isTargetILP32()) {
++    if (GuardWidth == 4) {
+       unsigned Reg32 = TRI->getSubReg(Reg, AArch64::sub_32);
+       BuildMI(MBB, MI, DL, get(AArch64::LDRWui))
+           .addDef(Reg32, RegState::Dead)
+@@ -2514,7 +2518,9 @@ bool AArch64InstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
+           .addMemOperand(*MI.memoperands_begin());
+     }
+   } else if (TM.getCodeModel() == CodeModel::Large) {
+-    assert(!Subtarget.isTargetILP32() && "how can large exist in ILP32?");
++    if (GuardWidth == 4)
++      report_fatal_error("Large code model with 4-byte stack protector not yet "
++                         "supported");
+     BuildMI(MBB, MI, DL, get(AArch64::MOVZXi), Reg)
+         .addGlobalAddress(GV, 0, AArch64II::MO_G0 | MO_NC)
+         .addImm(0);
+@@ -2535,13 +2541,18 @@ bool AArch64InstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
+         .addImm(0)
+         .addMemOperand(*MI.memoperands_begin());
+   } else if (TM.getCodeModel() == CodeModel::Tiny) {
++    // FIXME: This is computing the stack protector value as a constant
++    // pc-relative offset, not loading it from memory. Which is maybe
++    // an interesting compromise in some environments, but it looks like it
++    // was done accidentally.  And it probably shouldn't be tied to the
++    // code model.
+     BuildMI(MBB, MI, DL, get(AArch64::ADR), Reg)
+         .addGlobalAddress(GV, 0, OpFlags);
+   } else {
+     BuildMI(MBB, MI, DL, get(AArch64::ADRP), Reg)
+         .addGlobalAddress(GV, 0, OpFlags | AArch64II::MO_PAGE);
+     unsigned char LoFlags = OpFlags | AArch64II::MO_PAGEOFF | MO_NC;
+-    if (Subtarget.isTargetILP32()) {
++    if (GuardWidth == 4) {
+       unsigned Reg32 = TRI->getSubReg(Reg, AArch64::sub_32);
+       BuildMI(MBB, MI, DL, get(AArch64::LDRWui))
+           .addDef(Reg32, RegState::Dead)
+diff --git a/llvm/test/CodeGen/AArch64/stack-guard-width.ll b/llvm/test/CodeGen/AArch64/stack-guard-width.ll
+new file mode 100644
+index 000000000000..b9d24e5d8856
+--- /dev/null
++++ b/llvm/test/CodeGen/AArch64/stack-guard-width.ll
+@@ -0,0 +1,44 @@
++; NOTE: Do not autogenerate
++; The update tools can't understand this usage of split-file. (Maybe we should
++; add llc flags to set the PIC metadata.)
++; RUN: rm -rf %t && split-file %s %t && cd %t
++; RUN: cat a.ll nopic.ll > b.ll
++; RUN: cat a.ll pic.ll > c.ll
++; RUN: llc < b.ll | FileCheck %s
++; RUN: llc < c.ll -relocation-model=pic | FileCheck %s -check-prefix=PIC
++
++;--- a.ll
++target triple = "aarch64-unknown-linux-gnu"
++
++define dso_local void @f(ptr noundef %g) #0 {
++; CHECK: adrp x9, __stack_chk_guard
++; CHECK: ldr w9, [x9, :lo12:__stack_chk_guard]
++; CHECK: adrp x8, __stack_chk_guard
++; CHECK: ldr w8, [x8, :lo12:__stack_chk_guard]
++
++; PIC: adrp x9, :got:__stack_chk_guard
++; PIC: ldr x9, [x9, :got_lo12:__stack_chk_guard]
++; PIC: ldr w9, [x9]
++; PIC: adrp x8, :got:__stack_chk_guard
++; PIC: ldr x8, [x8, :got_lo12:__stack_chk_guard]
++; PIC: ldr w8, [x8]
++entry:
++  %g.addr = alloca ptr, align 8
++  %x = alloca [1000 x i8], align 1
++  store ptr %g, ptr %g.addr, align 8
++  %0 = load ptr, ptr %g.addr, align 8
++  %arraydecay = getelementptr inbounds [1000 x i8], ptr %x, i64 0, i64 0
++  call void %0(ptr noundef %arraydecay)
++  ret void
++}
++
++attributes #0 = { ssp }
++
++;--- nopic.ll
++!llvm.module.flags = !{!0}
++!0 = !{i32 1, !"stack-protector-guard-value-width", i32 4}
++
++;--- pic.ll
++!llvm.module.flags = !{!0, !1}
++!0 = !{i32 1, !"stack-protector-guard-value-width", i32 4}
++!1 = !{i32 8, !"PIC Level", i32 2}
+-- 
+2.34.1
+
