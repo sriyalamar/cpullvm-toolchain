@@ -208,6 +208,68 @@ def is_worktree_clean(git_repo: Git) -> bool:
     status_output = git_repo.run_cmd(["status", "--porcelain"]).strip()
     return len(status_output) == 0
 
+def update_eld_version(git_repo: Git, dry_run: bool) -> None:
+    try:
+        logger.info("Updating eld sha in versions.json")
+
+        # ensure we are on target branch
+        git_repo.run_cmd(["switch", to_branch])
+
+        # Get latest SHA
+        result = subprocess.run(
+            ["git", "ls-remote", "https://github.com/qualcomm/eld", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        eld_sha = result.stdout.strip().split()[0]
+        logger.info("Latest eld SHA: %s", eld_sha)
+
+        versions_file = git_repo.get_repo_path() / "qualcomm-software" / "versions.json"
+        logger.info("Versions file path: %s", versions_file)
+
+        # Load JSON
+        with open(versions_file) as f:
+            data = json.load(f)
+
+        current_sha = data["repos"]["eld"].get("tag", "")
+        logger.info("Current eld SHA in file: %s", current_sha)
+
+        if current_sha == eld_sha:
+            logger.info("Eld SHA already up to date. Skipping update.")
+            return
+
+        # Update values
+        data["repos"]["eld"]["tagType"] = "commithash"
+        data["repos"]["eld"]["tag"] = eld_sha
+
+        # Write back
+        with open(versions_file, "w") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+
+        logger.info("Updated versions.json with new eld SHA")
+
+        # Stage file
+        git_repo.run_cmd(["add", str(versions_file)])
+        # Check if there are staged changes
+        proc = subprocess.run(
+            ["git", "-C", str(git_repo.get_repo_path()), "diff", "--cached", "--quiet"]
+        )
+        if proc.returncode == 0:
+            logger.info("No changes to versions.json")
+            return
+        logger.info("Changes detected, committing...")
+        git_repo.run_cmd(["commit", "-m", f"Update eld to {eld_sha}"])
+        if dry_run:
+            logger.info("Dry run: skipping push")
+        else:
+            git_repo.run_cmd(["push", REMOTE_NAME])
+            logger.info("Pushed updated versions.json")
+
+    except Exception as e:
+        logger.exception("Failed to update eld version: %s", str(e))
+        raise
 
 def main():
     arg_parser = argparse.ArgumentParser(
@@ -256,9 +318,9 @@ def main():
 
     try:
         if pr_exist_for_label(args.project_name, MERGE_CONFLICT_LABEL):
-            logger.error("There are pending automerge PRs. Cannot continue.")
+            logger.error("---------------There are pending automerge PRs. Cannot continue.")
             sys.exit(1)
-        logger.info("No pending merge conflicts. Proceeding with automerge.")
+        logger.info("*************************No pending merge conflicts. Proceeding with automerge.")
 
         git_repo = Git(args.repo_path)
 
@@ -281,6 +343,8 @@ def main():
                 args.dry_run,
                 args.verbose,
             )
+        # After all merges, update eld revision
+        update_eld_version(git_repo, args.dry_run)
     except MergeConflictError as conflict:
         process_conflict(
             git_repo,
