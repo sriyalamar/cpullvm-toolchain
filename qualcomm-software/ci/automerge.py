@@ -208,7 +208,7 @@ def is_worktree_clean(git_repo: Git) -> bool:
     status_output = git_repo.run_cmd(["status", "--porcelain"]).strip()
     return len(status_output) == 0
 
-def update_eld_version(git_repo: Git, dry_run: bool) -> None:
+def update_eld_version(git_repo: Git, to_branch: str, dry_run: bool) -> None:
     try:
         logger.info("Updating eld sha in versions.json")
 
@@ -344,7 +344,7 @@ def main():
                 args.verbose,
             )
         # After all merges, update eld revision
-        update_eld_version(git_repo, args.dry_run)
+        update_eld_version(git_repo, args.to_branch, args.dry_run)
     except MergeConflictError as conflict:
         process_conflict(
             git_repo,
