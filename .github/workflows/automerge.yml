@@ -41,6 +41,18 @@ jobs:
           git fetch origin ${{ matrix.branches.from_branch }}:${{ matrix.branches.from_branch }}
           git pull --unshallow --ff-only origin ${{ matrix.branches.to_branch }}
       - name: Run automerge
-        run: python3 qualcomm-software/ci/automerge.py --project-name ${{ github.repository }} --from-branch ${{ matrix.branches.from_branch }} --to-branch ${{ matrix.branches.to_branch }} --verbose
+        run: |
+          python3 qualcomm-software/ci/automerge.py \
+            --project-name ${{ github.repository }} \
+            --from-branch ${{ matrix.branches.from_branch }} \
+            --to-branch ${{ matrix.branches.to_branch }} \
+            --verbose
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+      - name: Update eld version
+        run: |
+          python3 qualcomm-software/ci/update_repo_versions.py \
+          --repo-name eld \
+          --to-branch ${{ matrix.branches.to_branch }}
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
