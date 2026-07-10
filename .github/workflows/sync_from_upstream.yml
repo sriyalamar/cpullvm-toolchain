@@ -1,0 +1,57 @@
+# This workflow fetches changes from relevant branches from the
+# llvm/llvm-project repository (upstream) into the corresponding branches
+# in the qualcomm/cpullvm-toolchain repository (downstream), keeping them in sync.
+name: Sync from Upstream LLVM
+on:
+  workflow_dispatch:
+jobs:
+  Fetch-Upstream:
+    runs-on: ubuntu-24.04
+    if: github.repository == 'sriyalamar/cpullvm-toolchain'
+    strategy:
+      matrix:
+          branches:
+             - from_branch: release/22.x
+               to_branch: release/qualcomm-software/22.x          
+    env:
+      UPSTREAM_REMOTE: https://github.com/llvm/llvm-project.git
+    steps:
+      - name: Configure Access Token
+        uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
+        id: generate-token
+        with:
+          app_id: ${{ secrets.SYNC_APP_ID }}
+          private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ matrix.branch }}
+          token: ${{ steps.generate-token.outputs.token }}
+      - name: Configure Upstream Remote
+
+        run: git remote add upstream ${{ env.UPSTREAM_REMOTE }}
+      - name: Find Latest LLVM 22 RC
+        id: rc
+        run: |
+          RC_TAG=$(git ls-remote --tags ${UPSTREAM_REMOTE} "llvmorg-22.*-rc*" \
+            | awk -F/ '{print $3}' \
+            | sort -V \
+            | tail -1)
+
+          echo "Found RC tag: ${RC_TAG}"
+          echo "tag=${RC_TAG}" >> "$GITHUB_OUTPUT"
+      - name: Fetch RC Tag
+        run: |
+          git fetch upstream \
+            refs/tags/${{ steps.rc.outputs.tag }}:refs/tags/${{ steps.rc.outputs.tag }}
+      - name: Fast-forward to RC Tag
+        run: |
+          git merge --ff-only ${{ steps.rc.outputs.tag }}
+      - name: Fetch Upstream Changes
+        run: git pull --ff-only upstream ${{ matrix.branch }}
+      - name: Configure Git Identity
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Push Changes
+        run: git push origin ${{ matrix.branch }}
