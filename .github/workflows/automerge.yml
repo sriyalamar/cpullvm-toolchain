@@ -13,12 +13,14 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    if: >
+      github.repository == 'qualcomm/cpullvm-toolchain' ||
+      github.repository == 'sriyalamar/cpullvm-toolchain'
     strategy:
       matrix:
         branches:
           - from_branch: main
-            to_branch: qualcomm-software
+            to_branch: automerge-eld-version-update 
     steps:
       - name: Configure Access Token
         uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
