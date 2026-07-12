@@ -1,0 +1,118 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Manually triggered workflow to squash merge a specific LLVM RC tag into the
+# Qualcomm downstream release branch. If merge conflicts are detected, a
+# resolution PR is automatically created for developer review.
+name: Sync Release RC from Upstream LLVM
+on:
+  workflow_dispatch:
+    inputs:
+      rc_tag:
+        description: 'LLVM RC tag to sync (e.g. llvmorg-22.1.0-rc1)'
+        required: true
+      downstream_release_branch:
+        description: 'Qualcomm downstream release branch (e.g. release/qualcomm-software/22.x)'
+        required: true
+jobs:
+  Sync-Release-RC:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    if: >
+      github.repository == 'qualcomm/cpullvm-toolchain' ||
+      github.repository == 'sriyalamar/cpullvm-toolchain'
+    steps:
+      - name: Validate Inputs
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+          DOWNSTREAM_BRANCH: ${{ inputs.downstream_release_branch }}
+        run: |
+          if ! git ls-remote --exit-code https://github.com/llvm/llvm-project.git "refs/tags/${RC_TAG}" > /dev/null 2>&1; then
+            echo "ERROR: RC tag '${RC_TAG}' not found in upstream LLVM." && exit 1
+          fi
+          if ! git ls-remote --exit-code https://github.com/qualcomm/cpullvm-toolchain.git "refs/heads/${DOWNSTREAM_BRANCH}" > /dev/null 2>&1; then
+            echo "ERROR: Downstream branch '${DOWNSTREAM_BRANCH}' not found in repository." && exit 1
+          fi
+      - name: Configure Access Token
+        uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
+        id: generate-token
+        with:
+          app_id: ${{ secrets.SYNC_APP_ID }}
+          private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ inputs.downstream_release_branch }}
+          token: ${{ steps.generate-token.outputs.token }}
+          fetch-depth: 0
+      - name: Configure Git Identity
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Fetch Upstream RC Tag
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+        run: |
+          git remote add upstream https://github.com/llvm/llvm-project.git
+          git fetch upstream "refs/tags/${RC_TAG}:refs/tags/${RC_TAG}"
+      - name: Squash Merge RC Tag into Downstream Branch
+        env:
+          RC_TAG: ${{ inputs.rc_tag }}
+          DOWNSTREAM_BRANCH: ${{ inputs.downstream_release_branch }}
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          if git merge --squash "refs/tags/${RC_TAG}"; then
+            # Check if there is anything to commit (not already up to date)
+            if git diff --cached --quiet; then
+              echo "INFO: Downstream branch is already up to date with ${RC_TAG}. Nothing to merge."
+              exit 0
+            fi
+
+            git commit \
+              -m "[cpullvm] Sync to upstream LLVM ${RC_TAG}" \
+              -m "Squash merge of upstream LLVM ${RC_TAG} into ${DOWNSTREAM_BRANCH}."
+            git push origin "HEAD:${DOWNSTREAM_BRANCH}"
+
+          else
+            # Capture conflicting files before staging
+            CONFLICTING=$(git diff --name-only --diff-filter=U)
+            echo "ERROR: Merge conflicts detected in the following files:"
+            echo "${CONFLICTING}"
+
+            RESOLUTION_BRANCH="sync-rc/${RC_TAG}"
+            git checkout -b "${RESOLUTION_BRANCH}"
+            git add .
+            git commit \
+              -m "[cpullvm] WIP: Sync ${RC_TAG} - resolve conflicts before merging" \
+              -m "The following files have merge conflicts that need manual resolution:"$'\n'"${CONFLICTING}"
+            git push origin "${RESOLUTION_BRANCH}"
+
+            PR_BODY=$(
+              echo "## Sync to upstream LLVM ${RC_TAG}"
+              echo ""
+              echo "Automatically created due to merge conflicts when syncing upstream LLVM \`${RC_TAG}\` into \`${DOWNSTREAM_BRANCH}\`."
+              echo ""
+              echo "### Conflicting Files"
+              echo "\`\`\`"
+              echo "${CONFLICTING}"
+              echo "\`\`\`"
+              echo ""
+              echo "### Steps to Resolve"
+              echo "1. Check out the branch: \`git checkout ${RESOLUTION_BRANCH}\`"
+              echo "2. Resolve the conflicts in the listed files"
+              echo "3. Stage and commit the resolved files: \`git add . && git commit\`"
+              echo "4. Push the branch and merge this PR into \`${DOWNSTREAM_BRANCH}\`"
+            )
+
+            gh pr create \
+              --base "${DOWNSTREAM_BRANCH}" \
+              --head "${RESOLUTION_BRANCH}" \
+              --title "[cpullvm] Sync to upstream LLVM ${RC_TAG} (conflicts need resolution)" \
+              --body "${PR_BODY}"
+
+            echo "ERROR: Conflict resolution PR created for branch '${RESOLUTION_BRANCH}'."
+            echo "Resolve the conflicts and merge the PR to complete the sync."
+            exit 1
+          fi
