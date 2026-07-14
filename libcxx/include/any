@@ -203,11 +203,18 @@ public:
       __other.__call(_Action::_Move, this);
   }
 
+<<<<<<< HEAD
   template <
       class _ValueType,
       class _Tp        = decay_t<_ValueType>,
       enable_if_t<_And<_Not<is_same<_Tp, any>>, _Not<__is_inplace_type<_ValueType>>, is_copy_constructible<_Tp>>::value,
                   int> = 0>
+=======
+  template <class _ValueType,
+            class _Tp        = decay_t<_ValueType>,
+            enable_if_t<!is_same_v<_Tp, any> && !__is_inplace_type<_ValueType>::value && is_copy_constructible_v<_Tp>,
+                        int> = 0>
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
   _LIBCPP_HIDE_FROM_ABI any(_ValueType&& __value) : __h_(nullptr) {
     __any_imp::_Handler<_Tp>::__create(*this, std::forward<_ValueType>(__value));
   }

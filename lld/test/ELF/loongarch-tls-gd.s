@@ -5,7 +5,11 @@
 ## (a) code sequence can be converted from `pcalau12i+addi.[wd]` to `pcaddi`.
 ## (b) dynamic relocations can be omitted for GD->LE relaxation.
 
+<<<<<<< HEAD
 # RUN: llvm-mc --filetype=obj --triple=loongarch32 -mattr=-32s %t/a.s -o %t/a.32.o
+=======
+# RUN: llvm-mc --filetype=obj --triple=loongarch32 -mattr=+32s %t/a.s -o %t/a.32.o
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 # RUN: llvm-mc --filetype=obj --triple=loongarch32 -mattr=+32s,+relax %t/a.s -o %t/a.32.relax.o
 # RUN: llvm-mc --filetype=obj --triple=loongarch32 -mattr=+32s %t/bc.s -o %t/bc.32.o
 # RUN: ld.lld -shared -soname=bc.so %t/bc.32.o -o %t/bc.32.so

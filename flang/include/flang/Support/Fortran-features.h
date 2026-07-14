@@ -53,10 +53,17 @@ ENUM_CLASS(LanguageFeature, BackslashEscapes, OldDebugLines,
     PolymorphicActualAllocatableOrPointerToMonomorphicDummy, RelaxedPureDummy,
     UndefinableAsynchronousOrVolatileActual, AutomaticInMainProgram, PrintCptr,
     SavedLocalInSpecExpr, PrintNamelist, AssumedRankPassedToNonAssumedRank,
+<<<<<<< HEAD
     IgnoreIrrelevantAttributes, Unsigned, ContiguousOkForSeqAssociation,
     ForwardRefExplicitTypeDummy, InaccessibleDeferredOverride,
     CudaWarpMatchFunction, DoConcurrentOffload, TransferBOZ, Coarray,
     PointerPassObject)
+=======
+    IgnoreIrrelevantAttributes, Unsigned, AmbiguousStructureConstructor,
+    ContiguousOkForSeqAssociation, ForwardRefExplicitTypeDummy,
+    InaccessibleDeferredOverride, CudaWarpMatchFunction, DoConcurrentOffload,
+    TransferBOZ, Coarray, PointerPassObject)
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 // Portability and suspicious usage warnings
 ENUM_CLASS(UsageWarning, Portability, PointerToUndefinable,

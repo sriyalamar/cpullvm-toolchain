@@ -106,9 +106,15 @@ public:
   _LIBCPP_HIDE_FROM_ABI bool try_acquire_for(chrono::duration<_Rep, _Period> const& __rel_time) {
     if (__rel_time == chrono::duration<_Rep, _Period>::zero())
       return try_acquire();
+<<<<<<< HEAD
 
     return std::__atomic_wait_unless_with_timeout(
         __a_, memory_order_relaxed, [this](ptrdiff_t& __old) { return __try_acquire_impl(__old); }, __rel_time);
+=======
+    auto const __poll_fn = [this]() { return try_acquire(); };
+    return std::__libcpp_thread_poll_with_backoff(__poll_fn, __libcpp_timed_backoff_policy(), __rel_time) ==
+           __poll_with_backoff_results::__poll_success;
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
   }
   _LIBCPP_HIDE_FROM_ABI bool try_acquire() {
     auto __old = __a_.load(memory_order_relaxed);

@@ -15,8 +15,11 @@ Fortran's multi-image parallel features.
 
 The current revision of the PRIF specification is here:
 <https://doi.org/10.25344/S46S3W>
+<<<<<<< HEAD
 
 Library implementations of PRIF include:
 
 * [Caffeine](https://go.lbl.gov/caffeine) - portable open-source implementation targeting shared- and distributed-memory systems running Linux or macOS
 
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1

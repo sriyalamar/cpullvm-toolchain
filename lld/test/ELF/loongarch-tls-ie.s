@@ -1,7 +1,11 @@
 # REQUIRES: loongarch
 # RUN: rm -rf %t && split-file %s %t
 
+<<<<<<< HEAD
 # RUN: llvm-mc --filetype=obj --triple=loongarch32 --mattr=-32s %t/32.s -o %t/32.o
+=======
+# RUN: llvm-mc --filetype=obj --triple=loongarch32 --mattr=+32s %t/32.s -o %t/32.o
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 # RUN: llvm-mc --filetype=obj --triple=loongarch64 %t/64.s -o %t/64.o
 
 ## LA32 IE

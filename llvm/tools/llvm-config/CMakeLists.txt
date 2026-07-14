@@ -59,11 +59,14 @@ set(LLVM_CFLAGS "${LLVM_C_STD_FLAG} ${LLVM_DEFINITIONS}")
 # The language standard potentially affects the ABI/API of LLVM, so we want
 # to make sure it is reported by llvm-config.
 set(LLVM_CXXFLAGS "${CMAKE_CXX${CMAKE_CXX_STANDARD}_STANDARD_COMPILE_OPTION} ${LLVM_CXX_STDLIB_FLAG} ${LLVM_DEFINITIONS}")
+<<<<<<< HEAD
 if(LLVM_ENABLE_EH)
   append(${LLVM_CXXFLAGS_EH_ENABLE} LLVM_CXXFLAGS)
 else()
   append(${LLVM_CXXFLAGS_EH_DISABLE} LLVM_CXXFLAGS)
 endif()
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 if(LLVM_ENABLE_RTTI)
   append(${LLVM_CXXFLAGS_RTTI_ENABLE} LLVM_CXXFLAGS)
 else()

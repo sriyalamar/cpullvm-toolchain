@@ -401,6 +401,7 @@ define i32 @bseti_i32_10(i32 %a) nounwind {
   %or = or i32 %a, 1024
   ret i32 %or
 }
+<<<<<<< HEAD
 
 define i1 @no_insbi_known_bits(i32 %arg) {
 ; RV32I-LABEL: no_insbi_known_bits:
@@ -423,3 +424,5 @@ define i1 @no_insbi_known_bits(i32 %arg) {
   %res = icmp eq i32 %and, 127
   ret i1 %res
 }
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1

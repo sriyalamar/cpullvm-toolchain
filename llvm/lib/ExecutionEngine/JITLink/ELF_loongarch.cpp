@@ -43,6 +43,7 @@ public:
   }
 
 private:
+<<<<<<< HEAD
   DenseMap<std::pair<const Block *, orc::ExecutorAddrDiff>, const Edge *>
       RelPCAddHi20Map;
 
@@ -72,6 +73,8 @@ private:
                                     "for PCAddLo12 relocation type");
   }
 
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
   /// Apply fixup expression for edge to block content.
   Error applyFixup(LinkGraph &G, Block &B, const Edge &E) const {
     using namespace support;
@@ -181,6 +184,7 @@ private:
       *(ulittle32_t *)FixupPtr = RawInstr | Imm11_0;
       break;
     }
+<<<<<<< HEAD
     case PCAddHi20: {
       uint64_t Target = TargetAddress + Addend;
       int64_t Delta = Target - FixupAddress + 0x800;
@@ -223,6 +227,8 @@ private:
       *(little32_t *)(FixupPtr + 4) = Jirl | Lo10;
       break;
     }
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
     case Call36PCRel: {
       int64_t Value = TargetAddress - FixupAddress + Addend;
 

@@ -152,6 +152,7 @@ Changes to the Hexagon Backend
 Changes to the LoongArch Backend
 --------------------------------
 
+<<<<<<< HEAD
 * RuntimeDyld now supports the `Large` code model for LoongArch64.
 * The `PreserveMost` calling convention is now supported.
 * An option named `loongarch-enable-merge-offset` is added to allow disabling the `MergeBaseOffset` pass.
@@ -164,6 +165,10 @@ Changes to the LoongArch Backend
   to be used together when building for the LoongArch platform.
 * Improved LoongArch32 support by adding LA32R/LA32S relocations, PC-relative address materialization, and `call`/`tail` macro instructions.
 * Assorted codegen improvements.
+=======
+* DWARF fission is now compatible with linker relaxations, allowing `-gsplit-dwarf` and `-mrelax`
+  to be used together when building for the LoongArch platform.
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 Changes to the MIPS Backend
 ---------------------------
@@ -172,6 +177,7 @@ Changes to the PowerPC Backend
 ------------------------------
 
 * `half` now uses a soft float ABI, which works correctly in more cases.
+<<<<<<< HEAD
 * Add ``mtpidr`` alias introduced in ISA3.0.
 * Update `tlbie` instruction implementation for ISA3.0+.
 * Update ``strlen``, ``strcpy`` and ``memcmp`` to use milicode calls instead of library calls.
@@ -194,6 +200,8 @@ Changes to the PowerPC Backend
 * Consolidated predicate definitions into ``PPC.td``.
 * Cleanup asm parser code to use template functions for the various versions of
   ``getImm*Encoding()`` and ``is*Imm()`` used in ``PPCRegisterInfo.td``.
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 Changes to the RISC-V Backend
 -----------------------------
@@ -344,11 +352,14 @@ Changes to LLDB
   all the supported targets, along with the presence of (or lack of) optional
   features like XML parsing.
 * LLDB now includes formatters for many types from the MSVC STL.
+<<<<<<< HEAD
 * DIL (the new `frame variable` implementation) now uses ':' as a bitfield
   extraction range character. '-' is deprecated and will output an error when used.
 * LLDB 22 is the last release supporting FreeBSD 13 and below. As a result,
   LLDB 23 will remove support for FreeBSD on MIPS64 and assume that FreeBSD targets
   have watchpoint support.
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 Changes to BOLT
 ---------------------------------

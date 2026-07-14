@@ -571,7 +571,10 @@ Bug Fixes in This Version
 - Fixed a crash when parsing malformed #pragma clang loop vectorize_width(4,8,16)
   by diagnosing invalid comma-separated argument lists. (#GH166325)
 - Clang now treats enumeration constants of fixed-underlying enums as the enumerated type. (#GH172118)
+<<<<<<< HEAD
 - Fixed a failed assertion in the preprocessor when ``__has_embed`` parameters are missing parentheses. (#GH175088)
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 Bug Fixes to Compiler Builtins
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -734,6 +737,7 @@ LoongArch Support
 ^^^^^^^^^^^^^^^^^
 - Enable linker relaxation by default for loongarch64.
 
+<<<<<<< HEAD
 - Introduce LASX and LSX conversion intrinsics.
 
 - `__attribute__((target("lasx")))` now implies the `lsx` feature.
@@ -743,6 +747,11 @@ LoongArch Support
 
 - Add support for LoongArch32, including toolchain options and pre-defined macros.
 
+=======
+- DWARF fission is now compatible with linker relaxations, allowing `-gsplit-dwarf` and `-mrelax`
+  to be used together when building for the LoongArch platform.
+
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 RISC-V Support
 ^^^^^^^^^^^^^^
 
@@ -785,6 +794,7 @@ CUDA Support
   device architecture flags.
 
 - Support calling `consteval` function between different target.
+<<<<<<< HEAD
 
 PowerPC Support
 ^^^^^^^^^^^^^^^
@@ -792,6 +802,8 @@ PowerPC Support
 - Prototyped Dense Math Facility builtins.
 - Prototyped initial support for AMO load builtins.
 - Add support for ``-fpatchable-function-entry`` on PPC64LE.
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 AIX Support
 ^^^^^^^^^^^
@@ -910,8 +922,11 @@ Crash and bug fixes
 - The ``core.builtin.BuiltinFunctions`` checker crashed when passing
   ``_BitInt(N)`` or ``__int128_t`` to ``__builtin_add_overflow`` or similar
   checked arithmetic builtin functions. (#GH173795)
+<<<<<<< HEAD
 - Fixed a crash introduced in clang-20 when analyzing some "swap" functions.
   (#GH178797)
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 Improvements
 ^^^^^^^^^^^^

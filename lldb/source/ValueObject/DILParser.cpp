@@ -195,7 +195,11 @@ ASTNodeUP DILParser::ParsePostfixExpression() {
       m_dil_lexer.Advance();
       ASTNodeUP index = ParseExpression();
       assert(index && "ASTNodeUP must not contain a nullptr");
+<<<<<<< HEAD
       if (CurToken().GetKind() == Token::colon) {
+=======
+      if (CurToken().GetKind() == Token::minus) {
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
         m_dil_lexer.Advance();
         ASTNodeUP last_index = ParseExpression();
         assert(last_index && "ASTNodeUP must not contain a nullptr");

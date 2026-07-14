@@ -1310,16 +1310,25 @@ void DAP::StartEventThreads() {
 
 llvm::Error DAP::InitializeDebugger(const DAPSession &session) {
   // Find the existing debugger by ID
+<<<<<<< HEAD
   lldb::SBDebugger found_debugger =
       lldb::SBDebugger::FindDebuggerWithID(session.debuggerId);
   if (!found_debugger.IsValid()) {
+=======
+  debugger = lldb::SBDebugger::FindDebuggerWithID(session.debuggerId);
+  if (!debugger.IsValid()) {
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
     return llvm::createStringError(
         "Unable to find existing debugger for debugger ID");
   }
 
   // Find the target within the debugger by its globally unique ID
   lldb::SBTarget target =
+<<<<<<< HEAD
       found_debugger.FindTargetByGloballyUniqueID(session.targetId);
+=======
+      debugger.FindTargetByGloballyUniqueID(session.targetId);
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
   if (!target.IsValid()) {
     return llvm::createStringError(
         "Unable to find existing target for target ID");

@@ -127,6 +127,35 @@ public:
   using MemoryMonitor::MemoryMonitor;
 
   lldb::thread_result_t MonitorThread() {
+<<<<<<< HEAD
+=======
+#if defined(__linux__)
+    struct pollfd fds;
+    fds.fd = open("/proc/pressure/memory", O_RDWR | O_NONBLOCK);
+    if (fds.fd < 0)
+      return {};
+    fds.events = POLLPRI;
+
+    llvm::scope_exit cleanup([&]() { close(fds.fd); });
+
+    // Detect a 50ms stall in a 2 second time window.
+    const char trig[] = "some 50000 2000000";
+    if (write(fds.fd, trig, strlen(trig) + 1) < 0)
+      return {};
+
+    while (!m_done) {
+      int n = poll(&fds, 1, g_timeout);
+      if (n > 0) {
+        if (fds.revents & POLLERR)
+          return {};
+        if (fds.revents & POLLPRI)
+          m_callback();
+      }
+    }
+#endif
+
+#if defined(_WIN32)
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
     HANDLE low_memory_notification =
         CreateMemoryResourceNotification(LowMemoryResourceNotification);
     if (!low_memory_notification)

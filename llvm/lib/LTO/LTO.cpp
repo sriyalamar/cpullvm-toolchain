@@ -806,7 +806,11 @@ LTO::addModule(InputFile &Input, ArrayRef<SymbolResolution> InputRes,
   // If any of the modules inside of a input bitcode file was compiled with
   // ThinLTO, we assume that the whole input file also was compiled with
   // ThinLTO.
+<<<<<<< HEAD
   Input.IsThinLTO |= IsThinLTO;
+=======
+  Input.IsThinLTO = IsThinLTO;
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
   auto ModSyms = Input.module_symbols(ModI);
   addModuleToGlobalRes(ModSyms, Res,
@@ -1217,9 +1221,13 @@ Error LTO::checkPartiallySplit() {
 }
 
 Error LTO::run(AddStreamFn AddStream, FileCache Cache) {
+<<<<<<< HEAD
   llvm::scope_exit CleanUp([this]() { cleanup(); });
 
   if (Error EC = serializeInputsForDistribution())
+=======
+  if (Error EC = handleArchiveInputs())
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
     return EC;
 
   // Compute "dead" symbols, we don't want to import/export these!

@@ -102,6 +102,7 @@ COFF Improvements
   with ``-fat-lto-objects:no``, LLD will link LLVM FatLTO objects using the
   relocatable object file.
   (`#165529 <https://github.com/llvm/llvm-project/pull/165529>`_)
+<<<<<<< HEAD
 * Added ``/linkreprofullpathrsp`` to print the full path to each object
   passed to the link line to a file. This is used in particular when linking
   Arm64X binaries.
@@ -128,6 +129,16 @@ COFF Improvements
   (`#150897 <https://github.com/llvm/llvm-project/pull/150897>`_)
 * Prevent emitting relocations for discarded weak wrapped symbols.
   (`#156214 <https://github.com/llvm/llvm-project/pull/156214>`_)
+=======
+* ``/linkreprofullpathrsp`` prints the full path to each object passed to the link line to a file.
+  (`#174971 <https://github.com/llvm/llvm-project/pull/165449>`_)
+* ``-prefetch-inputs`` can improve link times by asynchronously loading input files in RAM.
+  This will dampen the effect of input file I/O latency on link times.
+  However this flag can have an adverse effect when linking a large number of inputs files, or if all
+  inputs do not fit in RAM at once. For those cases, linking might be a bit slower since the inputs
+  will be streamed into RAM upfront, only to be evicted later by swapping.
+  (`#169224 <https://github.com/llvm/llvm-project/pull/169224>`_)
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 MinGW Improvements
 ------------------

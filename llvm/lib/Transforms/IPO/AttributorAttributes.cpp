@@ -10495,7 +10495,11 @@ struct AANoFPClassImpl : AANoFPClass {
       const DominatorTree *DT = nullptr;
       AssumptionCache *AC = nullptr;
       const TargetLibraryInfo *TLI = nullptr;
+<<<<<<< HEAD
       Function *F = getAnchorScope();
+=======
+      Function *F = getAssociatedFunction();
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
       if (F) {
         TLI = InfoCache.getTargetLibraryInfoForFunction(*F);
         if (!F->isDeclaration()) {

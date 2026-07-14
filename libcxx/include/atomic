@@ -608,7 +608,10 @@ template <class T>
 #  include <__atomic/atomic_init.h>
 #  include <__atomic/atomic_lock_free.h>
 #  include <__atomic/atomic_sync.h>
+<<<<<<< HEAD
 #  include <__atomic/atomic_sync_timed.h>
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 #  include <__atomic/atomic_waitable_traits.h>
 #  include <__atomic/check_memory_order.h>
 #  include <__atomic/contention_t.h>

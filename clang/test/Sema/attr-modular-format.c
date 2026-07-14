@@ -3,8 +3,11 @@
 int printf(const char *fmt, ...)  __attribute__((modular_format(__modular_printf, "__printf", "float")));  // no-error
 int myprintf(const char *fmt, ...)  __attribute__((modular_format(__modular_printf, "__printf", "float")));  // expected-error {{'modular_format' attribute requires 'format' attribute}}
 
+<<<<<<< HEAD
 int string_impl_fn(const char *fmt, ...)  __attribute__((modular_format("__modular_printf", "__printf", "float"), format(printf, 1, 2)));  // expected-error {{'modular_format' attribute requires parameter 1 to be an identifier}}
 
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 int lprintf(const char *fmt, ...) __attribute__((modular_format(__modular_printf, L"__printf", L"float"), format(printf, 1, 2)));
 // expected-warning@-1 2{{encoding prefix 'L' on an unevaluated string literal has no effect}}
 

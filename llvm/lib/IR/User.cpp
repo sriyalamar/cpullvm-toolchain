@@ -158,6 +158,11 @@ void *User::allocateFixedOperandUser(size_t Size, unsigned Us,
   Obj->NumUserOperands = Us;
   Obj->HasHungOffUses = false;
   Obj->HasDescriptor = DescBytes != 0;
+<<<<<<< HEAD
+=======
+  for (unsigned I = 0; I < Us; ++I)
+    new (&Operands[I]) Use(Obj);
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
   if (DescBytes != 0) {
     auto *DescInfo = reinterpret_cast<DescriptorInfo *>(Operands) - 1;
@@ -229,6 +234,7 @@ User::~User() {
   // instances, since those are extremely common.
   if (!isa<ConstantData>(this))
     ((void **)this)[-1] = AllocStart;
+<<<<<<< HEAD
 }
 
 void User::operator delete(void *Usr) { ::operator delete(((void **)Usr)[-1]); }
@@ -254,4 +260,8 @@ void User::operator delete(void *Usr, IntrusiveOperandsAllocMarker Marker) {
   LeadingSize = std::max(LeadingSize, sizeof(void *));
   uint8_t *Storage = static_cast<uint8_t *>(Usr) - LeadingSize;
   ::operator delete(Storage);
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 }
+
+void User::operator delete(void *Usr) { ::operator delete(((void **)Usr)[-1]); }

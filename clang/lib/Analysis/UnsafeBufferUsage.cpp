@@ -2283,6 +2283,7 @@ public:
                              ASTContext &Ctx) const override {
     if (UnsafeArg)
       Handler.handleUnsafeLibcCall(
+<<<<<<< HEAD
           Call,
           UnsafeLibcFunctionCallGadget::UnsafeKind::STRING |
               UnsafeLibcFunctionCallGadget::UnsafeKind::FORMAT_ATTR,
@@ -2293,6 +2294,13 @@ public:
           UnsafeLibcFunctionCallGadget::UnsafeKind::OTHERS |
               UnsafeLibcFunctionCallGadget::UnsafeKind::FORMAT_ATTR,
           Ctx);
+=======
+          Call, UnsafeLibcFunctionCallGadget::UnsafeKind::STRING, Ctx,
+          UnsafeArg);
+    else
+      Handler.handleUnsafeLibcCall(
+          Call, UnsafeLibcFunctionCallGadget::UnsafeKind::OTHERS, Ctx);
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
   }
 
   DeclUseList getClaimedVarUseSites() const override { return {}; }

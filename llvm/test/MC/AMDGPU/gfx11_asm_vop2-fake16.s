@@ -1916,6 +1916,7 @@ v_pk_fmac_f16 v5, -1, v2
 // GFX11: v_pk_fmac_f16 v5, -1, v2                ; encoding: [0xc1,0x04,0x0a,0x78]
 
 v_pk_fmac_f16 v5, 0.5, v2
+<<<<<<< HEAD
 // GFX11: v_pk_fmac_f16 v5, 0x3800, v2            ; encoding: [0xff,0x04,0x0a,0x78,0x00,0x38,0x00,0x00]
 
 v_pk_fmac_f16 v5, 0x38003800, v2
@@ -1954,6 +1955,43 @@ v_pk_fmac_f16 v5, v255, v2
 v_pk_fmac_f16 v5, vcc_hi, v2
 // GFX11: v_pk_fmac_f16 v5, vcc_hi, v2            ; encoding: [0x6b,0x04,0x0a,0x78]
 
+=======
+// GFX11: v_pk_fmac_f16 v5, 0.5, v2               ; encoding: [0xf0,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, exec_hi, v2
+// GFX11: v_pk_fmac_f16 v5, exec_hi, v2           ; encoding: [0x7f,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, exec_lo, v2
+// GFX11: v_pk_fmac_f16 v5, exec_lo, v2           ; encoding: [0x7e,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, m0, v2
+// GFX11: v_pk_fmac_f16 v5, m0, v2                ; encoding: [0x7d,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, null, v2
+// GFX11: v_pk_fmac_f16 v5, null, v2              ; encoding: [0x7c,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, s1, v2
+// GFX11: v_pk_fmac_f16 v5, s1, v2                ; encoding: [0x01,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, s105, v2
+// GFX11: v_pk_fmac_f16 v5, s105, v2              ; encoding: [0x69,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, src_scc, v2
+// GFX11: v_pk_fmac_f16 v5, src_scc, v2           ; encoding: [0xfd,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, ttmp15, v2
+// GFX11: v_pk_fmac_f16 v5, ttmp15, v2            ; encoding: [0x7b,0x04,0x0a,0x78]
+
+v_pk_fmac_f16 v5, v1, v2
+// GFX11: v_pk_fmac_f16 v5, v1, v2                ; encoding: [0x01,0x05,0x0a,0x78]
+
+v_pk_fmac_f16 v5, v255, v2
+// GFX11: v_pk_fmac_f16 v5, v255, v2              ; encoding: [0xff,0x05,0x0a,0x78]
+
+v_pk_fmac_f16 v5, vcc_hi, v2
+// GFX11: v_pk_fmac_f16 v5, vcc_hi, v2            ; encoding: [0x6b,0x04,0x0a,0x78]
+
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 v_pk_fmac_f16 v5, vcc_lo, v2
 // GFX11: v_pk_fmac_f16 v5, vcc_lo, v2            ; encoding: [0x6a,0x04,0x0a,0x78]
 

@@ -6,8 +6,13 @@
 //
 //===---------------------------------------------------------------------===//
 
+<<<<<<< HEAD
 #ifndef LLVM_DTLTO_DTLTO_H
 #define LLVM_DTLTO_DTLTO_H
+=======
+#ifndef LLVM_DTLTO_H
+#define LLVM_DTLTO_H
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 #include "llvm/LTO/LTO.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -15,6 +20,7 @@
 namespace llvm {
 namespace lto {
 
+<<<<<<< HEAD
 // The purpose of this class is to prepare inputs so that distributed ThinLTO
 // backend compilations can succeed.
 //
@@ -55,12 +61,20 @@ protected:
   LLVM_ABI llvm::Error serializeInputsForDistribution() override;
 
   LLVM_ABI void cleanup() override;
+=======
+class DTLTO : public LTO {
+public:
+  // Inherit contructors from LTO base class.
+  using LTO::LTO;
+  ~DTLTO() { removeTempFiles(); }
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 private:
   // Bump allocator for a purpose of saving updated module IDs.
   BumpPtrAllocator PtrAlloc;
   StringSaver Saver{PtrAlloc};
 
+<<<<<<< HEAD
   /// The output file to which this LTO invocation will contribute.
   StringRef LinkerOutputFile;
 
@@ -69,10 +83,25 @@ private:
 
   /// Controls preservation of any created temporary files.
   bool SaveTemps;
+=======
+  // Removes temporary files.
+  LLVM_ABI void removeTempFiles();
+
+  // Determines if a file at the given path is a thin archive file.
+  Expected<bool> isThinArchive(const StringRef ArchivePath);
+
+  // Write the archive member content to a file named after the module ID.
+  Error saveInputArchiveMember(lto::InputFile *Input);
+
+  // Iterates through all input files and saves their content
+  // to files if they are regular archive members.
+  Error saveInputArchiveMembers();
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
   // Array of input bitcode files for LTO.
   std::vector<std::shared_ptr<lto::InputFile>> InputFiles;
 
+<<<<<<< HEAD
   // Cache of whether a path refers to a thin archive.
   StringMap<bool> ArchiveIsThinCache;
 
@@ -84,3 +113,22 @@ private:
 } // namespace llvm
 
 #endif // LLVM_DTLTO_DTLTO_H
+=======
+  // A cache to avoid repeatedly reading the same archive file.
+  StringMap<bool> ArchiveFiles;
+
+public:
+  // Adds the input file to the LTO object's list of input files.
+  // For archive members, generates a new module ID which is a path to a real
+  // file on a filesystem.
+  LLVM_ABI virtual Expected<std::shared_ptr<lto::InputFile>>
+  addInput(std::unique_ptr<lto::InputFile> InputPtr) override;
+
+  // Entry point for DTLTO archives support.
+  LLVM_ABI virtual llvm::Error handleArchiveInputs() override;
+};
+} // namespace lto
+} // namespace llvm
+
+#endif // LLVM_DTLTO_H
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1

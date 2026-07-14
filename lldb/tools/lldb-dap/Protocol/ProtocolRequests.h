@@ -1312,11 +1312,14 @@ struct StackTraceResponseBody {
 };
 llvm::json::Value toJSON(const StackTraceResponseBody &);
 
+<<<<<<< HEAD
 /// Arguments for unknown request.
 using UnknownArguments = EmptyArguments;
 /// Response to unknowns request.
 using UnknownResponseBody = VoidResponse;
 
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 } // namespace lldb_dap::protocol
 
 #endif

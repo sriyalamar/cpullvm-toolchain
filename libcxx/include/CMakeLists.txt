@@ -214,7 +214,10 @@ set(files
   __atomic/atomic_lock_free.h
   __atomic/atomic_ref.h
   __atomic/atomic_sync.h
+<<<<<<< HEAD
   __atomic/atomic_sync_timed.h
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
   __atomic/atomic_waitable_traits.h
   __atomic/check_memory_order.h
   __atomic/contention_t.h

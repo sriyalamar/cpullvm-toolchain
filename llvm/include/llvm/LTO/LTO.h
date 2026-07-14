@@ -131,12 +131,16 @@ private:
   std::vector<std::pair<StringRef, Comdat::SelectionKind>> ComdatTable;
 
   MemoryBufferRef MbRef;
+<<<<<<< HEAD
   bool IsFatLTOObject = false;
   // For distributed compilation, each input must exist as an individual bitcode
   // file on disk and be identified by its ModuleID. Archive members and FatLTO
   // objects violate this. So, in these cases we flag that the bitcode must be
   // written out to a new standalone file.
   bool SerializeForDistribution = false;
+=======
+  bool IsMemberOfArchive = false;
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
   bool IsThinLTO = false;
   StringRef ArchivePath;
   StringRef MemberName;
@@ -199,6 +203,7 @@ public:
 
   // Returns the only BitcodeModule from InputFile.
   LLVM_ABI BitcodeModule &getSingleBitcodeModule();
+<<<<<<< HEAD
   // Returns the primary BitcodeModule from InputFile.
   LLVM_ABI BitcodeModule &getPrimaryBitcodeModule();
   // Returns the memory buffer reference for this input file.
@@ -213,6 +218,14 @@ public:
   bool isFatLTOObject() const { return IsFatLTOObject; }
   // Mark this bitcode as coming from a FatLTO object.
   void fatLTOObject(bool FO) { IsFatLTOObject = FO; }
+=======
+  // Returns the memory buffer reference for this input file.
+  MemoryBufferRef getFileBuffer() const { return MbRef; }
+  // Returns true if this input file is a member of an archive.
+  bool isMemberOfArchive() const { return IsMemberOfArchive; }
+  // Mark this input file as a member of archive.
+  void memberOfArchive(bool MA) { IsMemberOfArchive = MA; }
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
   // Returns true if bitcode is ThinLTO.
   bool isThinLTO() const { return IsThinLTO; }
@@ -640,6 +653,11 @@ public:
   addInput(std::unique_ptr<lto::InputFile> InputPtr) {
     return std::shared_ptr<lto::InputFile>(InputPtr.release());
   }
+<<<<<<< HEAD
+=======
+
+  virtual llvm::Error handleArchiveInputs() { return llvm::Error::success(); }
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 };
 
 /// The resolution for a symbol. The linker must provide a SymbolResolution for

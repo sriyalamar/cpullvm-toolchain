@@ -10,6 +10,10 @@ if(NOT DEFINED LLVM_VERSION_PATCH)
   set(LLVM_VERSION_PATCH 0)
 endif()
 if(NOT DEFINED LLVM_VERSION_SUFFIX)
+<<<<<<< HEAD
   set(LLVM_VERSION_SUFFIX)
+=======
+  set(LLVM_VERSION_SUFFIX -rc1)
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 endif()
 

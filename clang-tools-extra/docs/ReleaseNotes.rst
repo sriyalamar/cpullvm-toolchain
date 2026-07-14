@@ -93,6 +93,21 @@ Potentially Breaking Changes
 Improvements to clangd
 ----------------------
 
+<<<<<<< HEAD
+=======
+Inlay hints
+^^^^^^^^^^^
+
+- ``clangd`` now shows designator hints for aggregate initialization of structures 
+  with parentheses-list initialization (``CXXParenListInitExpr``) syntax. 
+
+Diagnostics
+^^^^^^^^^^^
+
+Semantic Highlighting
+^^^^^^^^^^^^^^^^^^^^^
+
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 Compile flags
 ^^^^^^^^^^^^^
 
@@ -158,10 +173,13 @@ Code completion
   allow fuzzy-matching with the ``FuzzyMatch`` option when suggesting
   macros. ``ExactPrefix`` is the default, which retains previous
   behavior of suggesting macros which match the prefix exactly.
+<<<<<<< HEAD
 - Improved support for C++23 "deducing this"
 - Header insertion now checks ``AngledHeaders`` and ``QuotedHeaders``
   against resolved rather than spelled paths, consistent with the
   existing behaviour of include-cleaner diagnostics.
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 
 Code actions
 ^^^^^^^^^^^^

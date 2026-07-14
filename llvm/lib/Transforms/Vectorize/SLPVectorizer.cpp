@@ -16588,6 +16588,7 @@ InstructionCost BoUpSLP::calculateTreeCostAndTrimNonProfitable(
   bool Changed = false;
   while (!Worklist.empty() && Worklist.top().second.first > 0) {
     TreeEntry *TE = Worklist.top().first;
+<<<<<<< HEAD
     if (TE->isGather() || TE->Idx == 0 || DeletedNodes.contains(TE) ||
         // Exit early if the parent node is split node and any of scalars is
         // used in other split nodes.
@@ -16597,6 +16598,9 @@ InstructionCost BoUpSLP::calculateTreeCostAndTrimNonProfitable(
            ArrayRef<TreeEntry *> Entries = getSplitTreeEntries(V);
            return Entries.size() > 1;
          }))) {
+=======
+    if (TE->isGather() || TE->Idx == 0 || DeletedNodes.contains(TE)) {
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
       Worklist.pop();
       continue;
     }

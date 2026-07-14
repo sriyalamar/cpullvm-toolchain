@@ -205,10 +205,16 @@ BitcodeCompiler::BitcodeCompiler(Ctx &ctx) : ctx(ctx) {
                                         ctx.arg.ltoPartitions,
                                         ltoModes[ctx.arg.ltoKind]);
   else
+<<<<<<< HEAD
     ltoObj = std::make_unique<lto::DTLTO>(
         createConfig(ctx), backend, ctx.arg.ltoPartitions,
         ltoModes[ctx.arg.ltoKind], ctx.arg.outputFile,
         !ctx.arg.saveTempsArgs.empty());
+=======
+    ltoObj = std::make_unique<lto::DTLTO>(createConfig(ctx), backend,
+                                          ctx.arg.ltoPartitions,
+                                          ltoModes[ctx.arg.ltoKind]);
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
   // Initialize usedStartStop.
   if (ctx.bitcodeFiles.empty())
     return;

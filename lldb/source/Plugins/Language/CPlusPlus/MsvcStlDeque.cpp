@@ -110,7 +110,11 @@ lldb_private::formatters::MsvcStlDequeSyntheticFrontEnd::Update() {
   if (!block_size_decl)
     return lldb::eRefetch;
   Scalar block_size = block_size_decl.GetConstantValue();
+<<<<<<< HEAD
   if (!block_size.IsValid() || block_size <= 0)
+=======
+  if (!block_size.IsValid())
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
     return lldb::eRefetch;
 
   ValueObjectSP offset_sp = storage_sp->GetChildMemberWithName("_Myoff");

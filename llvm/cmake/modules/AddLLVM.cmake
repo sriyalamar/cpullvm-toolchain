@@ -31,6 +31,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   set(LLVM_CXXFLAGS_RTTI_DISABLE "-qnortti")
 endif()
 
+<<<<<<< HEAD
 # Determine required flags to enable/disable EH.
 set(LLVM_CXXFLAGS_EH_DISABLE "")
 set(LLVM_CXXFLAGS_EH_ENABLE "")
@@ -49,6 +50,8 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "XL")
   set(LLVM_CXXFLAGS_EH_DISABLE "-qnoeh")
 endif()
 
+=======
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 function(llvm_update_compile_flags name)
   set(LLVM_COMPILE_CXXFLAGS "")
 
@@ -59,10 +62,30 @@ function(llvm_update_compile_flags name)
       message(AUTHOR_WARNING "Exception handling requires RTTI. Enabling RTTI for ${name}")
       set(LLVM_REQUIRES_RTTI ON)
     endif()
+<<<<<<< HEAD
     list(APPEND LLVM_COMPILE_CXXFLAGS ${LLVM_CXXFLAGS_EH_ENABLE})
   else()
     if(MSVC)
       list(APPEND LLVM_COMPILE_DEFINITIONS _HAS_EXCEPTIONS=0)
+=======
+    if(MSVC)
+      list(APPEND LLVM_COMPILE_CXXFLAGS "/EHsc")
+    endif()
+  else()
+    if(LLVM_COMPILER_IS_GCC_COMPATIBLE)
+      list(APPEND LLVM_COMPILE_CXXFLAGS "-fno-exceptions")
+      if(LLVM_ENABLE_UNWIND_TABLES)
+        list(APPEND LLVM_COMPILE_CXXFLAGS "-funwind-tables")
+      else()
+        list(APPEND LLVM_COMPILE_CXXFLAGS "-fno-unwind-tables")
+        list(APPEND LLVM_COMPILE_CXXFLAGS "-fno-asynchronous-unwind-tables")
+      endif()
+    elseif(MSVC)
+      list(APPEND LLVM_COMPILE_DEFINITIONS _HAS_EXCEPTIONS=0)
+      list(APPEND LLVM_COMPILE_CXXFLAGS "/EHs-c-")
+    elseif (CMAKE_CXX_COMPILER_ID MATCHES "XL")
+      list(APPEND LLVM_COMPILE_CXXFLAGS "-qnoeh")
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
     endif()
     list(APPEND LLVM_COMPILE_CXXFLAGS ${LLVM_CXXFLAGS_EH_DISABLE})
   endif()

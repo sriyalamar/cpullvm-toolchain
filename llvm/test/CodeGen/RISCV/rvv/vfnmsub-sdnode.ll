@@ -32,7 +32,11 @@ define <vscale x 1 x bfloat> @vfnmsub_vv_nxv1bf16(<vscale x 1 x bfloat> %va, <vs
 ;
 ; ZVFBFA-LABEL: vfnmsub_vv_nxv1bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, mf4, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, mf4, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vv v8, v9, v10
 ; ZVFBFA-NEXT:    ret
 ;
@@ -67,7 +71,11 @@ define <vscale x 1 x bfloat> @vfnmsub_vf_nxv1bf16(<vscale x 1 x bfloat> %va, <vs
 ;
 ; ZVFBFA-LABEL: vfnmsub_vf_nxv1bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, mf4, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, mf4, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vf v8, fa0, v9
 ; ZVFBFA-NEXT:    ret
 ;
@@ -104,7 +112,11 @@ define <vscale x 2 x bfloat> @vfnmsub_vv_nxv2bf16(<vscale x 2 x bfloat> %va, <vs
 ;
 ; ZVFBFA-LABEL: vfnmsub_vv_nxv2bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, mf2, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, mf2, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vv v8, v10, v9
 ; ZVFBFA-NEXT:    ret
 ;
@@ -139,7 +151,11 @@ define <vscale x 2 x bfloat> @vfnmsub_vf_nxv2bf16(<vscale x 2 x bfloat> %va, <vs
 ;
 ; ZVFBFA-LABEL: vfnmsub_vf_nxv2bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, mf2, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, mf2, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vf v8, fa0, v9
 ; ZVFBFA-NEXT:    ret
 ;
@@ -176,7 +192,11 @@ define <vscale x 4 x bfloat> @vfnmsub_vv_nxv4bf16(<vscale x 4 x bfloat> %va, <vs
 ;
 ; ZVFBFA-LABEL: vfnmsub_vv_nxv4bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, m1, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, m1, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vv v8, v9, v10
 ; ZVFBFA-NEXT:    ret
 ;
@@ -213,7 +233,11 @@ define <vscale x 4 x bfloat> @vfnmsub_vf_nxv4bf16(<vscale x 4 x bfloat> %va, <vs
 ;
 ; ZVFBFA-LABEL: vfnmsub_vf_nxv4bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, m1, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, m1, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vf v8, fa0, v9
 ; ZVFBFA-NEXT:    ret
 ;
@@ -252,7 +276,11 @@ define <vscale x 8 x bfloat> @vfnmsub_vv_nxv8bf16(<vscale x 8 x bfloat> %va, <vs
 ;
 ; ZVFBFA-LABEL: vfnmsub_vv_nxv8bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, m2, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, m2, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsac.vv v8, v12, v10
 ; ZVFBFA-NEXT:    ret
 ;
@@ -289,7 +317,11 @@ define <vscale x 8 x bfloat> @vfnmsub_vf_nxv8bf16(<vscale x 8 x bfloat> %va, <vs
 ;
 ; ZVFBFA-LABEL: vfnmsub_vf_nxv8bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, m2, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, m2, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsac.vf v8, fa0, v10
 ; ZVFBFA-NEXT:    ret
 ;
@@ -328,7 +360,11 @@ define <vscale x 16 x bfloat> @vfnmsub_vv_nxv16bf16(<vscale x 16 x bfloat> %va, 
 ;
 ; ZVFBFA-LABEL: vfnmsub_vv_nxv16bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, m4, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, m4, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vv v8, v16, v12
 ; ZVFBFA-NEXT:    ret
 ;
@@ -365,7 +401,11 @@ define <vscale x 16 x bfloat> @vfnmsub_vf_nxv16bf16(<vscale x 16 x bfloat> %va, 
 ;
 ; ZVFBFA-LABEL: vfnmsub_vf_nxv16bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, m4, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, m4, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vf v8, fa0, v12
 ; ZVFBFA-NEXT:    ret
 ;
@@ -458,7 +498,11 @@ define <vscale x 32 x bfloat> @vfnmsub_vv_nxv32bf16(<vscale x 32 x bfloat> %va, 
 ; ZVFBFA-LABEL: vfnmsub_vv_nxv32bf16:
 ; ZVFBFA:       # %bb.0:
 ; ZVFBFA-NEXT:    vl8re16.v v24, (a0)
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, m8, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, m8, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsub.vv v8, v24, v16
 ; ZVFBFA-NEXT:    ret
 ;
@@ -571,7 +615,11 @@ define <vscale x 32 x bfloat> @vfnmsub_vf_nxv32bf16(<vscale x 32 x bfloat> %va, 
 ;
 ; ZVFBFA-LABEL: vfnmsub_vf_nxv32bf16:
 ; ZVFBFA:       # %bb.0:
+<<<<<<< HEAD
 ; ZVFBFA-NEXT:    vsetvli a0, zero, e16alt, m8, ta, ma
+=======
+; ZVFBFA-NEXT:    vsetvli a0, zero, e16, m8, ta, ma
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 ; ZVFBFA-NEXT:    vfnmsac.vf v8, fa0, v16
 ; ZVFBFA-NEXT:    ret
 ;

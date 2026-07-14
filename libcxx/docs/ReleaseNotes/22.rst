@@ -39,7 +39,12 @@ Implemented Papers
 ------------------
 
 - P2592R3: Hashing support for ``std::chrono`` value classes (`Github <https://llvm.org/PR105358>`__)
+<<<<<<< HEAD
 - P2321R2: ``zip`` (`Github <https://llvm.org/PR105169>`__)
+=======
+- P2321R2: ``zip`` (`Github <https://llvm.org/PR105169>`__) (The paper is partially implemented. ``zip_transform_view``,
+  ``adjacent_view``, and ``adjacent_transform_view`` are implemented in this release)
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 - P2988R12: ``std::optional<T&>`` (`Github <https://llvm.org/PR148131>`__)
 - P3044R2: sub-``string_view`` from ``string`` (`Github <https://llvm.org/PR148140>`__)
 - P3223R2: Making ``std::istream::ignore`` less surprising (`Github <https://llvm.org/PR148178>`__)
@@ -96,6 +101,7 @@ Improvements and New Features
   - Some reallocations are now avoided in ``std::filesystem::path::lexically_relative``: 1.7x
   - ``ofstream::write`` passes large strings to system calls directly instead of copying them in chunks into a buffer
   - ``std::align`` is now an inline function, which allows the compiler to better optimize calls to it
+<<<<<<< HEAD
 
 - ``std::atomic::wait`` has been refactored to accept more types to use platform native wait functions directly.
   This is guarded behind the ABI Macro ``_LIBCPP_ABI_ATOMIC_WAIT_NATIVE_BY_SIZE``.
@@ -103,6 +109,15 @@ Improvements and New Features
 - Multiple internal types have been refactored to use ``[[no_unique_address]]``, resulting in faster compile times and
   reduced debug information.
 
+=======
+
+- ``std::atomic::wait`` has been refactored to accept more types to use platform native wait functions directly.
+  This is guarded behind the ABI Macro ``_LIBCPP_ABI_ATOMIC_WAIT_NATIVE_BY_SIZE``.
+
+- Multiple internal types have been refactored to use ``[[no_unique_address]]``, resulting in faster compile times and
+  reduced debug information.
+
+>>>>>>> refs/tags/llvmorg-22.1.0-rc1
 Deprecations and Removals
 -------------------------
 
