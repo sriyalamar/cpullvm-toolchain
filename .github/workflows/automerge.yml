@@ -20,7 +20,7 @@ jobs:
       matrix:
         branches:
           - from_branch: main
-            to_branch: automerge-eld-version-update
+            to_branch: qualcomm-software 
           - from_branch: release/23.x
             to_branch: automerge-23.x-fork-test
     steps:
