@@ -13,12 +13,14 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    if: >
+      github.repository == 'qualcomm/cpullvm-toolchain' ||
+      github.repository == 'sriyalamar/cpullvm-toolchain'
     strategy:
       matrix:
         branches:
           - from_branch: main
-            to_branch: qualcomm-software
+            to_branch: eld-sha-update-fork-test
           - from_branch: release/23.x
             to_branch: release/qualcomm-software/23.x
     steps:
