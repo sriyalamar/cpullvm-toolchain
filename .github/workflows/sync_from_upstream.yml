@@ -9,10 +9,13 @@ on:
 jobs:
   Fetch-Upstream:
     runs-on: ubuntu-24.04
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    if: github.repository == 'qualcomm/cpullvm-toolchain' || github.repository == 'sriyalamar/cpullvm-toolchain'
     strategy:
       matrix:
-        branch: [main, release/23.x]
+        include:
+          - branch: main
+          - branch: release/23.x
+            stop_at_tag: llvmorg-23.1.0-rc2
     env:
       UPSTREAM_REMOTE: https://github.com/llvm/llvm-project.git
     steps:
@@ -29,11 +32,25 @@ jobs:
           token: ${{ steps.generate-token.outputs.token }}
       - name: Configure Upstream Remote
         run: git remote add upstream ${{ env.UPSTREAM_REMOTE }}
-      - name: Fetch Upstream Changes
-        run: git pull --ff-only upstream ${{ matrix.branch }}
-      - name: Configure Git Identity
+      - name: Fetch and Push Upstream Changes
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      - name: Push Changes
-        run: git push origin ${{ matrix.branch }}
+          STOP_TAG="${{ matrix.stop_at_tag }}"
+          if [ -n "$STOP_TAG" ]; then
+            git fetch upstream ${{ matrix.branch }} --tags
+            if git rev-parse "$STOP_TAG" > /dev/null 2>&1; then
+              STOP_COMMIT=$(git rev-parse "${STOP_TAG}^{}")
+              LOCAL_HEAD=$(git rev-parse HEAD)
+              if [ "$LOCAL_HEAD" = "$STOP_COMMIT" ]; then
+                echo "Already at $STOP_TAG, nothing to sync."
+                exit 0
+              fi
+              git push origin "${STOP_COMMIT}:refs/heads/${{ matrix.branch }}"
+            else
+              echo "$STOP_TAG not yet tagged upstream, syncing normally."
+              git pull --ff-only upstream ${{ matrix.branch }}
+              git push origin ${{ matrix.branch }}
+            fi
+          else
+            git pull --ff-only upstream ${{ matrix.branch }}
+            git push origin ${{ matrix.branch }}
+          fi
