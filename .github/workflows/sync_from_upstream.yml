@@ -13,9 +13,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - branch: main
-          - branch: release/23.x
-            stop_at_tag: llvmorg-23.1.0-rc2
           - branch: release/22.x
             stop_at_tag: llvmorg-22.1.4
     env:
