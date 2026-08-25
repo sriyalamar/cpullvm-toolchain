@@ -9,31 +9,46 @@ on:
 jobs:
   Fetch-Upstream:
     runs-on: ubuntu-24.04
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    if: github.repository == 'sriyalamar/cpullvm-toolchain'
     strategy:
       matrix:
-        branch: [main, release/23.x]
+        include:
+          - branch: release/22.x
+            stop_at_tag: llvmorg-22.1.4
     env:
       UPSTREAM_REMOTE: https://github.com/llvm/llvm-project.git
     steps:
-      - name: Configure Access Token
-        uses: actions/create-github-app-token@f45685208fd9b88321d74015b5996fc8c3e43d18 # v1.0.0
-        id: generate-token
-        with:
-          app_id: ${{ secrets.SYNC_APP_ID }}
-          private_key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           ref: ${{ matrix.branch }}
-          token: ${{ steps.generate-token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
       - name: Configure Upstream Remote
         run: git remote add upstream ${{ env.UPSTREAM_REMOTE }}
       - name: Fetch Upstream Changes
-        run: git pull --ff-only upstream ${{ matrix.branch }}
+        run: |
+          git fetch upstream ${{ matrix.branch }}
+          if [ -n "${{ matrix.stop_at_tag }}" ]; then
+            git fetch upstream "refs/tags/${{ matrix.stop_at_tag }}:refs/tags/${{ matrix.stop_at_tag }}" 2>/dev/null || true
+          fi
       - name: Configure Git Identity
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Push Changes
-        run: git push origin ${{ matrix.branch }}
+        run: |
+          STOP_TAG="${{ matrix.stop_at_tag }}"
+          if [ -n "$STOP_TAG" ] && \
+             git rev-parse "$STOP_TAG" > /dev/null 2>&1 && \
+             git merge-base --is-ancestor "$(git rev-parse "${STOP_TAG}^{}")" "upstream/${{ matrix.branch }}"; then
+            STOP_COMMIT=$(git rev-parse "${STOP_TAG}^{}")
+            if git merge-base --is-ancestor "$STOP_COMMIT" HEAD; then
+              echo "${{ matrix.branch }} is at or past $STOP_TAG. Sync stopped."
+              exit 0
+            fi
+            git merge --ff-only "$STOP_COMMIT"
+          else
+            git merge --ff-only "upstream/${{ matrix.branch }}"
+          fi
+          git push origin ${{ matrix.branch }}
