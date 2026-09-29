@@ -10,6 +10,7 @@
 name: Linux Premerge Checks
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened]
     # This should run only if any non-*.md, non-.github/ files were modified as
