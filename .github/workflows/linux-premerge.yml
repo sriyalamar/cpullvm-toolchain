@@ -31,8 +31,10 @@ concurrency:
 
 jobs:
   build-and-test:
-    # Don't run on forks
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    # Run on the upstream repository and the fork used to test this workflow.
+    if: >-
+      github.repository == 'qualcomm/cpullvm-toolchain' ||
+      github.repository == 'sriyalamar/cpullvm-toolchain'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
     runs-on: ${{ matrix.runner }}
 
