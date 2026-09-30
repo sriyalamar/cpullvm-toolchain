@@ -42,7 +42,7 @@ jobs:
       actions: write
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
     if: >-
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/run ')
