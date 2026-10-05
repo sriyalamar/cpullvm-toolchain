@@ -5,6 +5,16 @@ name: Run Workflow Test
 
 on:
   workflow_dispatch:
+    inputs:
+      test_status:
+        description: 'Test result to simulate'
+        required: true
+        type: choice
+        options:
+          - success
+          - failure
+          - cancel
+        default: success
 
 permissions:
   contents: read
@@ -22,8 +32,17 @@ jobs:
           echo "Event: $GITHUB_EVENT_NAME"
 
       - name: Run verification command
+        env:
+          TEST_STATUS: ${{ inputs.test_status }}
         run: |
           echo "The /run command successfully started this workflow."
+          echo "Requested test status: ${TEST_STATUS}"
+          echo "Sleeping for 3 minutes so cancellation can be tested."
+          sleep 180
+          if [[ "${TEST_STATUS}" == "failure" ]]; then
+            echo "Simulating a verification failure."
+            exit 1
+          fi
           echo "The workflow completed its verification steps."
 
   report-status:
@@ -31,67 +50,35 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-24.04
     permissions:
+      checks: write
       contents: read
-      issues: write
-      pull-requests: write
     steps:
       - name: Report workflow result
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
           RESULT: ${{ needs.build-and-test.result }}
-          HEAD_BRANCH: ${{ github.ref_name }}
-          RUN_ID: ${{ github.run_id }}
+          HEAD_SHA: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ github.token }}
           script: |
-            const headOwner = context.repo.owner;
-            const pullRequests = await github.rest.pulls.list({
+            const conclusions = {
+              success: 'success',
+              failure: 'failure',
+              cancelled: 'cancelled',
+              skipped: 'skipped',
+            };
+            const conclusion = conclusions[process.env.RESULT] || 'failure';
+            await github.rest.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              head: `${headOwner}:${process.env.HEAD_BRANCH}`,
-              state: 'open',
-              per_page: 100,
+              name: 'Manual Workflow: Run Workflow Test',
+              head_sha: process.env.HEAD_SHA,
+              status: 'completed',
+              conclusion,
+              details_url: process.env.RUN_URL,
+              output: {
+                title: `Workflow completed with ${conclusion}`,
+                summary: `The simulated workflow result was ${process.env.RESULT}.`,
+              },
             });
-
-            if (!pullRequests.data.length) {
-              core.info(`No open pull request found for ${headOwner}:${process.env.HEAD_BRANCH}`);
-              return;
-            }
-
-            const marker = `<!-- run-workflow-status:${process.env.RUN_ID} -->`;
-            const body = [
-              marker,
-              `Workflow \`${context.workflow}\` completed with status \`${process.env.RESULT}\`.`,
-              `Branch: \`${process.env.HEAD_BRANCH}\``,
-              `[View workflow run](${process.env.RUN_URL})`,
-            ].join('\n\n');
-
-            for (const pullRequest of pullRequests.data) {
-              const comments = await github.paginate(
-                github.rest.issues.listComments,
-                {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pullRequest.number,
-                  per_page: 100,
-                },
-              );
-              const existing = comments.find(comment => comment.body.includes(marker));
-
-              if (existing) {
-                await github.rest.issues.updateComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: existing.id,
-                  body,
-                });
-              } else {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pullRequest.number,
-                  body,
-                });
-              }
-            }

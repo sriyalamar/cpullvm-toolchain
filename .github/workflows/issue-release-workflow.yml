@@ -12,7 +12,7 @@
 # This comment will create a pull request from <branch> to the latest release
 # branch.
 #
-# /run <workflow-file>
+# /run <workflow-file> [test-status]
 #
 # This comment will dispatch an allowlisted workflow against the head branch of
 # the pull request. Only workflows intended for PR verification are supported.
@@ -41,8 +41,6 @@ jobs:
     permissions:
       actions: write
       contents: read
-      issues: write
-      pull-requests: write
     if: >-
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/run ')
@@ -68,16 +66,27 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
-            const command = process.env.COMMENT_BODY.match(/^\/run\s+(\S+)\s*$/);
+            const command = process.env.COMMENT_BODY.match(/^\/run\s+(\S+)(?:\s+(\S+))?\s*$/);
             if (!command) {
-              core.setFailed('Usage: /run <workflow-file>');
+              core.setFailed('Usage: /run <workflow-file> [test-status]');
               return;
             }
 
             const workflow = command[1];
+            const testStatus = command[2] || 'success';
             const allowedWorkflows = JSON.parse(process.env.ALLOWED_WORKFLOWS);
             if (!allowedWorkflows.includes(workflow)) {
               core.setFailed(`Workflow '${workflow}' is not allowlisted`);
+              return;
+            }
+
+            if (workflow !== 'run-workflow-test.yml' && command[2]) {
+              core.setFailed('The optional test status is only supported by run-workflow-test.yml');
+              return;
+            }
+
+            if (workflow === 'run-workflow-test.yml' && !['success', 'failure', 'cancel'].includes(testStatus)) {
+              core.setFailed(`Unsupported test status '${testStatus}'`);
               return;
             }
 
@@ -92,36 +101,16 @@ jobs:
               return;
             }
 
-            await github.rest.actions.createWorkflowDispatch({
+            const dispatch = {
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: workflow,
               ref: pullRequest.data.head.ref,
-            });
-
-            core.setOutput('workflow-url', `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/${workflow}`);
-            core.setOutput('workflow', workflow);
-            core.setOutput('ref', pullRequest.data.head.ref);
-
-      - name: Report dispatched workflow
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        env:
-          WORKFLOW: ${{ steps.dispatch.outputs.workflow }}
-          WORKFLOW_URL: ${{ steps.dispatch.outputs.workflow-url }}
-          REF: ${{ steps.dispatch.outputs.ref }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const body = [
-              `Dispatched \`${process.env.WORKFLOW}\` for branch \`${process.env.REF}\`.`,
-              `[View workflow runs](${process.env.WORKFLOW_URL})`,
-            ].join('\n\n');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body,
-            });
+            };
+            if (workflow === 'run-workflow-test.yml') {
+              dispatch.inputs = { test_status: testStatus };
+            }
+            await github.rest.actions.createWorkflowDispatch(dispatch);
 
   backport-commits:
     name: Backport Commits
