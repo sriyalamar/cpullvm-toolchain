@@ -7,12 +7,10 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# This workflow runs build configurations in parallel for multiple
-# operating systems and architectures.
+# This workflow runs native Linux AArch64 build configurations in parallel.
 # It is intended to be triggered as part of a **nightly build** to
 # validate these configurations and test them automatically.
-# Currently this workflow encompasses building runtimes as part of the toolchain
-# natively on non-x86_64 Linux targets.
+# It builds runtimes as part of the toolchain natively on Linux AArch64.
 
 name: Native Runtime Nightly Build and Test
 
@@ -65,28 +63,7 @@ jobs:
             target_os: Linux-AArch64
             runner: ubuntu-24.04-arm
 
-          - build_script: build.ps1
-            test_script: test.ps1
-            install_script: install_dependencies.ps1
-            target_os: Windows-x86_64
-            runner: windows-2025
-
-          - build_script: build.ps1
-            test_script: test.ps1
-            install_script: install_dependencies.ps1
-            target_os: Windows-AArch64
-            runner: windows-11-arm
-
     steps:
-      # Not setting these can cause lit test failures on Windows machines when
-      # files with ex: different line endings are compared.
-      - name: Preconfigure git
-        shell: bash
-        run: |
-          git config --global core.autocrlf false
-          git config --global core.eol lf
-          git config --global core.longpaths true
-
       - name: Checkout source
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
