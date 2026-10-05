@@ -55,6 +55,7 @@ jobs:
           "nightly-release.yml",
           "nightly.yml",
           "qcom-preflight-checks.yml",
+          "run-workflow-test.yml",
           "zephyr-twister-tests.yml"
         ]
     steps:
