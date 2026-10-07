@@ -76,19 +76,33 @@ jobs:
             }
 
             const commenter = context.payload.comment.user.login;
-            let membership;
+            let authorized = false;
             try {
-              membership = await github.rest.teams.getMembershipForUserInOrg({
+              const membership = await github.rest.teams.getMembershipForUserInOrg({
                 org: 'qualcomm',
                 team_slug: 'cpullvm-toolchain-write',
                 username: commenter,
               });
+              authorized = membership.data.state === 'active';
             } catch (error) {
-              core.setFailed(`User '${commenter}' is not a member of cpullvm-toolchain-write`);
-              return;
+              core.warning('Team membership is not available to this workflow token; checking repository permission instead.');
             }
-            if (membership.data.state !== 'active') {
-              core.setFailed(`User '${commenter}' is not an active member of cpullvm-toolchain-write`);
+
+            if (!authorized) {
+              try {
+                const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: commenter,
+                });
+                authorized = ['admin', 'maintain', 'write'].includes(permission.data.permission);
+              } catch (error) {
+                authorized = false;
+              }
+            }
+
+            if (!authorized) {
+              core.setFailed(`User '${commenter}' is not authorized to run workflows`);
               return;
             }
 
