@@ -12,7 +12,7 @@
 # This comment will create a pull request from <branch> to the latest release
 # branch.
 #
-# /run <workflow-file> [test-status]
+# /run <workflow-file>
 #
 # This comment will dispatch an allowlisted workflow against the head branch of
 # the pull request. Only workflows intended for PR verification are supported.
@@ -41,19 +41,15 @@ jobs:
     permissions:
       actions: write
       contents: read
+      issues: write
+      pull-requests: read
     if: >-
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/run ')
     env:
       ALLOWED_WORKFLOWS: >-
         [
-          "libcxx-test.yml",
-          "linux-premerge.yml",
-          "native-runtime-nightly.yml",
-          "nightly-release.yml",
           "nightly.yml",
-          "qcom-preflight-checks.yml",
-          "run-workflow-test.yml",
           "zephyr-twister-tests.yml"
         ]
     steps:
@@ -66,27 +62,33 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
-            const command = process.env.COMMENT_BODY.match(/^\/run\s+(\S+)(?:\s+(\S+))?\s*$/);
+            const command = process.env.COMMENT_BODY.match(/^\/run\s+(\S+)\s*$/);
             if (!command) {
-              core.setFailed('Usage: /run <workflow-file> [test-status]');
+              core.setFailed('Usage: /run <workflow-file>');
               return;
             }
 
             const workflow = command[1];
-            const testStatus = command[2] || 'success';
             const allowedWorkflows = JSON.parse(process.env.ALLOWED_WORKFLOWS);
             if (!allowedWorkflows.includes(workflow)) {
               core.setFailed(`Workflow '${workflow}' is not allowlisted`);
               return;
             }
 
-            if (workflow !== 'run-workflow-test.yml' && command[2]) {
-              core.setFailed('The optional test status is only supported by run-workflow-test.yml');
+            const commenter = context.payload.comment.user.login;
+            let membership;
+            try {
+              membership = await github.rest.teams.getMembershipForUserInOrg({
+                org: 'qualcomm',
+                team_slug: 'contributors.cpullvm-toolchain',
+                username: commenter,
+              });
+            } catch (error) {
+              core.setFailed(`User '${commenter}' is not a member of Contributors.cpullvm-toolchain`);
               return;
             }
-
-            if (workflow === 'run-workflow-test.yml' && !['success', 'failure', 'cancel'].includes(testStatus)) {
-              core.setFailed(`Unsupported test status '${testStatus}'`);
+            if (membership.data.state !== 'active') {
+              core.setFailed(`User '${commenter}' is not an active member of Contributors.cpullvm-toolchain`);
               return;
             }
 
@@ -101,16 +103,23 @@ jobs:
               return;
             }
 
-            const dispatch = {
+            await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: workflow,
               ref: pullRequest.data.head.ref,
-            };
-            if (workflow === 'run-workflow-test.yml') {
-              dispatch.inputs = { test_status: testStatus };
-            }
-            await github.rest.actions.createWorkflowDispatch(dispatch);
+            });
+
+            const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/${workflow}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `Dispatched \`${workflow}\` for branch \`${pullRequest.data.head.ref}\`.`,
+                `[View workflow runs](${workflowUrl})`,
+              ].join('\n\n'),
+            });
 
   backport-commits:
     name: Backport Commits

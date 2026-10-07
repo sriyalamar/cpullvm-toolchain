@@ -7,10 +7,12 @@
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# This workflow runs native Linux AArch64 build configurations in parallel.
+# This workflow runs build configurations in parallel for multiple
+# operating systems and architectures.
 # It is intended to be triggered as part of a **nightly build** to
 # validate these configurations and test them automatically.
-# It builds runtimes as part of the toolchain natively on Linux AArch64.
+# Currently this workflow encompasses building runtimes as part of the toolchain
+# natively on non-x86_64 Linux targets.
 
 name: Native Runtime Nightly Build and Test
 
@@ -27,10 +29,8 @@ permissions:
 
 jobs:
   build-and-test:
-    # Run on the upstream repository and the fork used to test this workflow.
-    if: >-
-      github.repository == 'qualcomm/cpullvm-toolchain' ||
-      github.repository == 'sriyalamar/cpullvm-toolchain'
+    # Don't run on forks
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
     runs-on: ${{ matrix.runner }}
 
@@ -63,7 +63,28 @@ jobs:
             target_os: Linux-AArch64
             runner: ubuntu-24.04-arm
 
+          - build_script: build.ps1
+            test_script: test.ps1
+            install_script: install_dependencies.ps1
+            target_os: Windows-x86_64
+            runner: windows-2025
+
+          - build_script: build.ps1
+            test_script: test.ps1
+            install_script: install_dependencies.ps1
+            target_os: Windows-AArch64
+            runner: windows-11-arm
+
     steps:
+      # Not setting these can cause lit test failures on Windows machines when
+      # files with ex: different line endings are compared.
+      - name: Preconfigure git
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          git config --global core.longpaths true
+
       - name: Checkout source
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -94,41 +115,3 @@ jobs:
       - name: Test
         if: matrix.test_script != ''
         run: ./qualcomm-software/scripts/${{ matrix.test_script }}
-
-  report-status:
-    if: always() && github.event_name == 'workflow_dispatch'
-    needs: build-and-test
-    runs-on: ubuntu-24.04
-    permissions:
-      checks: write
-      contents: read
-    steps:
-      - name: Report workflow result
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        env:
-          RESULT: ${{ needs.build-and-test.result }}
-          HEAD_SHA: ${{ github.sha }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const conclusions = {
-              success: 'success',
-              failure: 'failure',
-              cancelled: 'cancelled',
-              skipped: 'skipped',
-            };
-            const conclusion = conclusions[process.env.RESULT] || 'failure';
-            await github.rest.checks.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'Manual Workflow: Native Runtime Nightly',
-              head_sha: process.env.HEAD_SHA,
-              status: 'completed',
-              conclusion,
-              details_url: process.env.RUN_URL,
-              output: {
-                title: `Workflow completed with ${conclusion}`,
-                summary: `The native runtime workflow completed with ${process.env.RESULT}.`,
-              },
-            });
