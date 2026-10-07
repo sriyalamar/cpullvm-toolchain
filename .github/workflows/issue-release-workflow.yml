@@ -80,15 +80,15 @@ jobs:
             try {
               membership = await github.rest.teams.getMembershipForUserInOrg({
                 org: 'qualcomm',
-                team_slug: 'contributors.cpullvm-toolchain',
+                team_slug: 'cpullvm-toolchain-write',
                 username: commenter,
               });
             } catch (error) {
-              core.setFailed(`User '${commenter}' is not a member of Contributors.cpullvm-toolchain`);
+              core.setFailed(`User '${commenter}' is not a member of cpullvm-toolchain-write`);
               return;
             }
             if (membership.data.state !== 'active') {
-              core.setFailed(`User '${commenter}' is not an active member of Contributors.cpullvm-toolchain`);
+              core.setFailed(`User '${commenter}' is not an active member of cpullvm-toolchain-write`);
               return;
             }
 
