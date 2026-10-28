@@ -8,6 +8,19 @@ name: Nightly Release Build and Test
 
 on:
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number that requested this run'
+        required: false
+        type: number
+        default: 0
+  workflow_call:
+    inputs:
+      pr_number:
+        description: 'Pull request number that requested this run'
+        required: false
+        type: number
+        default: 0
   pull_request:
     paths:
       - '.github/workflows/nightly-release.yml'
@@ -25,3 +38,31 @@ jobs:
     uses: ./.github/workflows/nightly.yml
     with:
       enable_assertions: false
+      pr_number: ${{ inputs.pr_number }}
+
+  report-status:
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.pr_number != 0
+    needs: nightly-release
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Report workflow result
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          RUN_STATUS: ${{ needs.nightly-release.result == 'success' && 'success' || 'failure' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PR_NUMBER),
+              body: [
+                `Workflow \`${context.workflow}\` completed with status \`${process.env.RUN_STATUS}\`.`,
+                `[View workflow run](${process.env.RUN_URL})`,
+              ].join('\n\n'),
+            });

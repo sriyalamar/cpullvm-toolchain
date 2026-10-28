@@ -45,7 +45,9 @@ jobs:
       pull-requests: write
     if: >-
       github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/run ')
+      startsWith(github.event.comment.body, '/run ') &&
+      (github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'OWNER')
     env:
       ALLOWED_WORKFLOWS: >-
         [
@@ -84,11 +86,6 @@ jobs:
                 throw new Error(`Workflow '${workflow}' is not allowlisted`);
               }
 
-              const allowedAssociations = ['MEMBER', 'OWNER'];
-              if (!allowedAssociations.includes(context.payload.comment.author_association)) {
-                throw new Error('User is not authorized to run workflows');
-              }
-
               const pullRequest = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -103,12 +100,15 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: workflow,
-                ref: pullRequest.data.head.ref,
+                ref: context.payload.repository.default_branch,
+                inputs: {
+                  pr_number: String(issueNumber),
+                },
               });
 
               const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/${workflow}`;
               await comment([
-                `Dispatched \`${workflow}\` for branch \`${pullRequest.data.head.ref}\`.`,
+                `Dispatched \`${workflow}\` for PR #${issueNumber}.`,
                 `[View workflow runs](${workflowUrl})`,
               ].join('\n\n'));
             } catch (error) {
