@@ -22,18 +22,18 @@ name: Nightly Build and Test
 on:
   workflow_dispatch:
     inputs:
-      pr_number:
-        description: 'Pull request number that requested this run'
-        type: number
-        default: 0
+      pr_sha:
+        description: 'Exact pull request head SHA'
+        type: string
+        default: ''
       enable_assertions:
         description: 'Enable LLVM assertions'
         type: boolean
         default: true
   workflow_call:
     inputs:
-      pr_number:
-        description: 'Pull request number that requested this run'
+      pr_sha:
+        description: 'Exact pull request head SHA'
         type: string
         default: ''
       enable_assertions:
@@ -58,45 +58,9 @@ env:
   EXTRA_CMAKE_ARGS: ${{ format('{0}', inputs.enable_assertions) == 'false' && '-DLLVM_ENABLE_ASSERTIONS=OFF' || '-DLLVM_ENABLE_ASSERTIONS=ON' }}
 
 jobs:
-  resolve-pr:
-    runs-on: ubuntu-24.04
-    permissions:
-      pull-requests: read
-    outputs:
-      head_repo: ${{ steps.resolve.outputs.head_repo }}
-      head_ref: ${{ steps.resolve.outputs.head_ref }}
-    steps:
-      - name: Resolve requested pull request
-        id: resolve
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        env:
-          PR_NUMBER: ${{ inputs.pr_number }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const prNumber = Number(process.env.PR_NUMBER || 0);
-            if (!prNumber) {
-              core.setOutput('head_repo', '');
-              core.setOutput('head_ref', '');
-              return;
-            }
-
-            const pullRequest = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-            });
-            if (pullRequest.data.head.repo.full_name !== context.repo.full_name) {
-              core.setFailed('Pull requests from external repositories are not supported');
-              return;
-            }
-            core.setOutput('head_repo', pullRequest.data.head.repo.full_name);
-            core.setOutput('head_ref', pullRequest.data.head.ref);
-
   build-and-test-Linux-x86:
     # Don't run on forks
-    if: github.repository == 'qualcomm/cpullvm-toolchain' && needs.resolve-pr.result == 'success'
-    needs: resolve-pr
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: build.sh on Linux-x86_64
     runs-on: cpullvm-ubuntu24-x86_64
     steps:
@@ -106,8 +70,7 @@ jobs:
           # We build in the repository and rely on clean to cleanup possible
           # old build products if the runner doesn't do it itself.
           clean: true
-          repository: ${{ needs.resolve-pr.outputs.head_repo || github.repository }}
-          ref: ${{ needs.resolve-pr.outputs.head_ref || github.ref }}
+          ref: ${{ inputs.pr_sha || github.ref }}
 
       - name: Apply llvm-project patches
         run: python3 qualcomm-software/cmake/patch_repo.py --method apply qualcomm-software/patches/llvm-project
@@ -131,9 +94,9 @@ jobs:
         run: ./qualcomm-software/scripts/test.sh
 
   build-and-test:
-    if: github.repository == 'qualcomm/cpullvm-toolchain' && needs.resolve-pr.result == 'success'
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
-    needs: [resolve-pr, build-and-test-Linux-x86]
+    needs: build-and-test-Linux-x86
     runs-on: ${{ matrix.runner }}
 
     strategy:
@@ -180,8 +143,7 @@ jobs:
           # We build in the repository and rely on clean to cleanup possible
           # old build products if the runner doesn't do it itself.
           clean: true
-          repository: ${{ needs.resolve-pr.outputs.head_repo || github.repository }}
-          ref: ${{ needs.resolve-pr.outputs.head_ref || github.ref }}
+          ref: ${{ inputs.pr_sha || github.ref }}
 
       - name: Download Linux-x86 package
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0

@@ -9,15 +9,15 @@ name: Nightly Release Build and Test
 on:
   workflow_dispatch:
     inputs:
-      pr_number:
-        description: 'Pull request number that requested this run'
+      pr_sha:
+        description: 'Exact pull request head SHA'
         required: false
-        type: number
-        default: 0
+        type: string
+        default: ''
   workflow_call:
     inputs:
-      pr_number:
-        description: 'Pull request number that requested this run'
+      pr_sha:
+        description: 'Exact pull request head SHA'
         required: false
         type: string
         default: ''
@@ -38,8 +38,6 @@ jobs:
     uses: ./.github/workflows/nightly.yml
     permissions:
       contents: read
-      pull-requests: read
-      actions: read
     with:
       enable_assertions: false
-      pr_number: ${{ inputs.pr_number }}
+      pr_sha: ${{ inputs.pr_sha }}

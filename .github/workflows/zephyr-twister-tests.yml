@@ -6,11 +6,6 @@ name: Zephyr Twister Tests
 on:
   workflow_dispatch:
     inputs:
-      pr_number:
-        description: 'Pull request number that requested this run'
-        required: false
-        type: number
-        default: 0
       run-id:
         description: >
           Run ID of a cpullvm-toolchain workflow that built the Linux x86_64 toolchain.
@@ -25,11 +20,6 @@ on:
         default: cpullvm-packages-build.sh-Linux-x86
   workflow_call:
     inputs:
-      pr_number:
-        description: 'Pull request number that requested this run'
-        required: false
-        type: string
-        default: ''
       run-id:
         description: 'Run ID of a CPULLVM workflow that built the Linux x86_64 toolchain'
         required: false
@@ -55,42 +45,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  resolve-pr:
-    runs-on: ubuntu-24.04
-    permissions:
-      pull-requests: read
-    outputs:
-      pr_number: ${{ steps.resolve.outputs.pr_number }}
-    steps:
-      - name: Resolve requested pull request
-        id: resolve
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        env:
-          PR_NUMBER: ${{ inputs.pr_number }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const prNumber = Number(process.env.PR_NUMBER || 0);
-            if (!prNumber) {
-              core.setOutput('pr_number', '');
-              return;
-            }
-
-            const pullRequest = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-            });
-            if (pullRequest.data.head.repo.full_name !== context.repo.full_name) {
-              core.setFailed('Pull requests from external repositories are not supported');
-              return;
-            }
-            core.setOutput('pr_number', String(prNumber));
-
   run-twister-tests:
-    if: github.repository == 'qualcomm/cpullvm-toolchain' && needs.resolve-pr.result == 'success'
+    if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: Twister tests for ${{ matrix.platform }} (${{ matrix.subset }}/2)
-    needs: resolve-pr
     # Zephyr's tests take a relatively long time to complete but can be split to
     # run in parallel on different machines fairly easily (by platform/arch,
     # using `--subset`, etc.). So let's use Github's runners to avoid tying up
@@ -170,9 +127,9 @@ jobs:
             twister-out/twister.json
 
   merge-twister-results:
-    if: always() && github.repository == 'qualcomm/cpullvm-toolchain' && needs.resolve-pr.result == 'success'
+    if: always() && github.repository == 'qualcomm/cpullvm-toolchain'
     name: Merge Twister XML results
-    needs: [resolve-pr, run-twister-tests]
+    needs: run-twister-tests
     runs-on: ubuntu-24.04
     steps:
       - name: Download split XML results
