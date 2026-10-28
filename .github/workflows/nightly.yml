@@ -43,6 +43,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/nightly.yml'
+  issue_comment:
+    types: [created]
   schedule:
     - cron: '0 23,11 * * *'
       timezone: 'America/Los_Angeles'
@@ -58,7 +60,51 @@ env:
   EXTRA_CMAKE_ARGS: ${{ format('{0}', inputs.enable_assertions) == 'false' && '-DLLVM_ENABLE_ASSERTIONS=OFF' || '-DLLVM_ENABLE_ASSERTIONS=ON' }}
 
 jobs:
+  request-nightly:
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.body == 'check-nightly' &&
+      (github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'OWNER')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Dispatch nightly workflow
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const issueNumber = context.issue.number;
+            const pullRequest = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: issueNumber,
+            });
+            if (pullRequest.data.head.repo.full_name !== context.repo.full_name) {
+              core.setFailed('Workflow dispatch is only supported for pull requests from this repository');
+              return;
+            }
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'nightly.yml',
+              ref: context.payload.repository.default_branch,
+              inputs: { pr_number: String(issueNumber) },
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: 'Dispatched `nightly.yml` for this pull request.',
+            });
+
   resolve-pr:
+    if: github.event_name != 'issue_comment'
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: read
@@ -95,7 +141,10 @@ jobs:
 
   build-and-test-Linux-x86:
     # Don't run on forks
-    if: github.repository == 'qualcomm/cpullvm-toolchain' && needs.resolve-pr.result == 'success'
+    if: >-
+      github.event_name != 'issue_comment' &&
+      github.repository == 'qualcomm/cpullvm-toolchain' &&
+      needs.resolve-pr.result == 'success'
     needs: resolve-pr
     name: build.sh on Linux-x86_64
     runs-on: cpullvm-ubuntu24-x86_64
@@ -131,7 +180,10 @@ jobs:
         run: ./qualcomm-software/scripts/test.sh
 
   build-and-test:
-    if: github.repository == 'qualcomm/cpullvm-toolchain' && needs.resolve-pr.result == 'success'
+    if: >-
+      github.event_name != 'issue_comment' &&
+      github.repository == 'qualcomm/cpullvm-toolchain' &&
+      needs.resolve-pr.result == 'success'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
     needs: [resolve-pr, build-and-test-Linux-x86]
     runs-on: ${{ matrix.runner }}
@@ -214,7 +266,10 @@ jobs:
         run: ./qualcomm-software/scripts/${{ matrix.test_script }}
 
   report-status:
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.pr_number != 0
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.pr_number != 0
     needs: [resolve-pr, build-and-test-Linux-x86, build-and-test]
     runs-on: ubuntu-24.04
     permissions:
