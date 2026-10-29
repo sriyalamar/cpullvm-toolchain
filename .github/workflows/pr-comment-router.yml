@@ -36,7 +36,7 @@ permissions:
 
 jobs:
   validate:
-    if: github.repository == 'qualcomm/cpullvm-toolchain' && (github.event_name == 'workflow_dispatch' || github.event.issue.pull_request != null)
+    if: github.event_name == 'workflow_dispatch' || github.event.issue.pull_request != null
     runs-on: ubuntu-24.04
     outputs:
       pr_number: ${{ steps.request.outputs.pr_number }}

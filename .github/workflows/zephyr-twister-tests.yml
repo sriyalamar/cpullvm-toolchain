@@ -46,7 +46,6 @@ concurrency:
 
 jobs:
   run-twister-tests:
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
     name: Twister tests for ${{ matrix.platform }} (${{ matrix.subset }}/2)
     # Zephyr's tests take a relatively long time to complete but can be split to
     # run in parallel on different machines fairly easily (by platform/arch,
@@ -127,7 +126,7 @@ jobs:
             twister-out/twister.json
 
   merge-twister-results:
-    if: always() && github.repository == 'qualcomm/cpullvm-toolchain'
+    if: always()
     name: Merge Twister XML results
     needs: run-twister-tests
     runs-on: ubuntu-24.04
