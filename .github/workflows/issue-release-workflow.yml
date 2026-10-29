@@ -11,7 +11,7 @@
 #
 # This comment will create a pull request from <branch> to the latest release
 # branch.
-
+#
 name: Issue Release Workflow
 
 permissions:
