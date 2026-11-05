@@ -18,7 +18,7 @@
 # x86_64 platforms are built and tested separately.
 
 name: Nightly Build and Test
-# DNM: Trigger the Windows nightly matrix while validating PR #750.
+# DNM: Trigger the Windows nightly matrix to validate libxml2 dependency detection.
 
 on:
   workflow_dispatch:
