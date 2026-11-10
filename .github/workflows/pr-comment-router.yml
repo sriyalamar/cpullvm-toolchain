@@ -27,7 +27,7 @@ jobs:
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
         with:
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.ROUTER_TEST_TOKEN }}
           script: |
             const comment = process.env.COMMENT_BODY.trim();
             if (!comment.startsWith('/run')) {
@@ -52,17 +52,8 @@ jobs:
               return;
             }
 
-            let authorized = false;
-            try {
-              const membership = await github.rest.teams.getMembershipForUserInOrg({
-                org: 'qualcomm',
-                team_slug: 'cpullvm-toolchain-write',
-                username: context.payload.comment.user.login,
-              });
-              authorized = membership.data.state === 'active';
-            } catch (error) {
-              core.info(`Unable to verify team membership: ${error.message}`);
-            }
+            // Temporary fork-only authorization for router verification.
+            const authorized = context.payload.comment.user.login === 'sriyalamar';
             if (!authorized) {
               await reply(`@${context.payload.comment.user.login} is not authorized to run pull request workflows.`);
               return;
@@ -138,7 +129,7 @@ jobs:
           NIGHTLY_RELEASE_RESULT: ${{ needs.nightly-release.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.ROUTER_TEST_TOKEN }}
           script: |
             const result = process.env.COMMAND === 'nightly'
               ? process.env.NIGHTLY_RESULT
