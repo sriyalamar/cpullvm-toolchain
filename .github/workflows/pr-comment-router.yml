@@ -1,4 +1,5 @@
 name: PR Comment Router
+# Temporary fork configuration for router verification.
 run-name: "PR workflow request #${{ github.event.issue.number }}"
 
 on:
