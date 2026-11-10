@@ -60,7 +60,7 @@ env:
 jobs:
   build-and-test-Linux-x86:
     # Don't run on forks
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    if: github.repository == 'sriyalamar/cpullvm-toolchain'
     name: build.sh on Linux-x86_64
     runs-on: cpullvm-ubuntu24-x86_64
     steps:
@@ -94,7 +94,7 @@ jobs:
         run: ./qualcomm-software/scripts/test.sh
 
   build-and-test:
-    if: github.repository == 'qualcomm/cpullvm-toolchain'
+    if: github.repository == 'sriyalamar/cpullvm-toolchain'
     name: ${{ matrix.build_script }} on ${{ matrix.target_os }}
     needs: build-and-test-Linux-x86
     runs-on: ${{ matrix.runner }}
