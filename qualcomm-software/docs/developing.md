@@ -139,3 +139,5 @@ To request a build and test workflow for a pull request, add a comment containin
 The workflow tests GitHub's merge result for the pull request. If the pull request changes afterward, comment again to test the new merge result. The request comment is updated with a link to the workflow and its final result.
 
 Only members of the CPULLVM Toolchain write team can request a workflow, and pull requests from forks are not supported. Each comment must contain one command and no other text.
+
+<!-- Temporary fork pull request for PR comment router verification. -->
